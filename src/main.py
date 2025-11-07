@@ -420,13 +420,13 @@ def interactive_menu(db_manager: DuckDBManager):
 
 def get_cloudwatch_log_groups_from_db(db_manager: DuckDBManager):
     """
-    Extract CloudWatch log group names from logging configurations in the database.
+    Extract CloudWatch log group names and regions from logging configurations in the database.
 
     Args:
         db_manager (DuckDBManager): Database manager instance
 
     Returns:
-        list: List of tuples (log_group_name, web_acl_name, web_acl_id)
+        list: List of tuples (log_group_name, web_acl_name, web_acl_id, region)
     """
     conn = db_manager.get_connection()
 
@@ -448,13 +448,15 @@ def get_cloudwatch_log_groups_from_db(db_manager: DuckDBManager):
         # Format: arn:aws:logs:region:account-id:log-group:log-group-name:*
         # or: arn:aws:logs:region:account-id:log-group:log-group-name
         try:
-            # Extract log group name from ARN
-            # Split by ':log-group:' and take the second part
-            if ':log-group:' in dest_arn:
+            # Extract region and log group name from ARN
+            # ARN format: arn:partition:service:region:account:resource
+            arn_parts = dest_arn.split(':')
+            if len(arn_parts) >= 6 and ':log-group:' in dest_arn:
+                region = arn_parts[3]  # Region is at index 3
                 log_group_part = dest_arn.split(':log-group:')[1]
                 # Remove trailing ':*' if present
                 log_group_name = log_group_part.rstrip(':*')
-                log_groups.append((log_group_name, web_acl_name, web_acl_id))
+                log_groups.append((log_group_name, web_acl_name, web_acl_id, region))
             else:
                 logger.warning(f"Could not parse log group from ARN: {dest_arn}")
         except Exception as e:
@@ -623,11 +625,15 @@ def main():
                         # CloudWatch - First try to get log groups from database
                         db_log_groups = get_cloudwatch_log_groups_from_db(db_manager)
 
+                        log_group_name = None
+                        log_group_region = None
+
                         if db_log_groups:
                             print("\n📋 CloudWatch log groups from Web ACL configurations:")
-                            for idx, (log_group_name, web_acl_name, web_acl_id) in enumerate(db_log_groups, 1):
-                                print(f"{idx}. {log_group_name}")
+                            for idx, (lg_name, web_acl_name, web_acl_id, region) in enumerate(db_log_groups, 1):
+                                print(f"{idx}. {lg_name}")
                                 print(f"    Web ACL: {web_acl_name}")
+                                print(f"    Region: {region}")
 
                             print(f"{len(db_log_groups) + 1}. Enter a different log group name")
 
@@ -636,12 +642,15 @@ def main():
                                 idx = int(selection) - 1
                                 if 0 <= idx < len(db_log_groups):
                                     log_group_name = db_log_groups[idx][0]
+                                    log_group_region = db_log_groups[idx][3]
                                 else:
                                     # Manual entry
                                     log_group_name = input("Enter CloudWatch log group name: ")
+                                    log_group_region = None  # Use current region
                             except ValueError:
                                 # Try to use it as log group name directly
                                 log_group_name = selection
+                                log_group_region = None  # Use current region
                         else:
                             # Fallback: Query CloudWatch API for log groups
                             print("\n💡 No CloudWatch log groups found in database configurations.")
@@ -664,7 +673,31 @@ def main():
                             else:
                                 log_group_name = input("Enter CloudWatch log group name: ")
 
-                        fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+                        # Fetch logs using the correct region
+                        if log_group_region:
+                            logger.info(f"Using region {log_group_region} for CloudWatch log group")
+                            fetcher = CloudWatchFetcher(region=log_group_region)
+                            log_events = fetcher.get_log_events(log_group_name, start_time, end_time)
+
+                            if not log_events:
+                                logger.warning("No log events found in CloudWatch")
+                            else:
+                                logger.info(f"Fetched {len(log_events)} log events")
+
+                                # Parse logs
+                                from processors.log_parser import WAFLogParser
+                                parser = WAFLogParser()
+                                parsed_logs = parser.parse_batch(log_events, source='cloudwatch')
+
+                                if not parsed_logs:
+                                    logger.warning("No logs were successfully parsed")
+                                else:
+                                    # Store in database
+                                    db_manager.insert_log_entries(parsed_logs)
+                                    logger.info(f"Successfully stored {len(parsed_logs)} log entries")
+                        else:
+                            # Use the existing function which uses current region
+                            fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
 
                     elif log_choice == '2':
                         # S3
