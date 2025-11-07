@@ -473,12 +473,26 @@ aws logs describe-log-groups --log-group-name-prefix aws-waf-logs
 
 ## Usage
 
+> **Note**: Use the `waf-analyzer.py` launcher script in the root directory to run the tool. This handles Python path configuration automatically.
+
 ### Interactive Mode (Default)
 
 Run the analyzer without arguments for a guided, menu-driven experience:
 
 ```bash
-python src/main.py
+python3 waf-analyzer.py
+```
+
+Or make it executable and run directly:
+
+```bash
+chmod +x waf-analyzer.py
+./waf-analyzer.py
+```
+
+**Alternative (using Python module syntax)**:
+```bash
+python3 -m src.main  # Run from project root directory
 ```
 
 You'll see an interactive menu:
@@ -518,7 +532,7 @@ You'll see an interactive menu:
 For automation and CI/CD pipelines, provide all arguments:
 
 ```bash
-python src/main.py \
+python3 waf-analyzer.py \
   --scope REGIONAL \
   --log-source cloudwatch \
   --log-group aws-waf-logs-myapp \
@@ -530,7 +544,7 @@ python src/main.py \
 ### Command-Line Options
 
 ```bash
-python src/main.py [OPTIONS]
+python3 waf-analyzer.py [OPTIONS]
 
 Options:
   --db-path PATH          Path to DuckDB database file (default: data/waf_analysis.duckdb)
@@ -550,28 +564,28 @@ Options:
 
 **Analyze 6 months of CloudWatch logs**:
 ```bash
-python src/main.py --months 6 --log-source cloudwatch --log-group aws-waf-logs-myapp
+python3 waf-analyzer.py --months 6 --log-source cloudwatch --log-group aws-waf-logs-myapp
 ```
 
 **Analyze S3 logs for CloudFront WAF**:
 ```bash
-python src/main.py --scope CLOUDFRONT --log-source s3 \
+python3 waf-analyzer.py --scope CLOUDFRONT --log-source s3 \
   --s3-bucket my-waf-logs --s3-prefix cloudfront/waf/
 ```
 
 **Generate report from existing database**:
 ```bash
-python src/main.py --skip-config --skip-logs --output custom_report.xlsx
+python3 waf-analyzer.py --skip-config --skip-logs --output custom_report.xlsx
 ```
 
 **Fetch configs only (no logs)**:
 ```bash
-python src/main.py --skip-logs
+python3 waf-analyzer.py --skip-logs
 ```
 
 **Interactive mode - view inventory first**:
 ```bash
-python src/main.py
+python3 waf-analyzer.py
 # Select option 1: Fetch configurations
 # Select option 3: View inventory
 # Review Web ACLs, then decide on next steps
