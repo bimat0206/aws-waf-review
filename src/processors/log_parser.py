@@ -67,10 +67,10 @@ class WAFLogParser:
             Optional[Dict[str, Any]]: Parsed and normalized log entry
         """
         try:
-            # CloudWatch events typically store JSON payload in 'message'.
-            # Exported logs may use '@message'. Support both to handle
-            # different acquisition paths consistently.
-            message = event.get('message') or event.get('@message') or event.get('Message')
+            # CloudWatch events from exports and Insights use '@message'.
+            # Standard API responses use 'message'. Check '@message' first
+            # since that's where WAF log data typically resides.
+            message = event.get('@message') or event.get('message') or event.get('Message')
 
             if not message:
                 logger.warning("Empty message in CloudWatch event")
