@@ -20,26 +20,26 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 
 ```
 aws-waf-analyzer/
-├── config/                        # Configuration files
-│   ├── prompts/                  # LLM prompt templates (version controlled)
+├── config/                                 # Configuration files
+│   ├── prompts/                           # LLM prompt templates (version controlled)
 │   │   ├── security_effectiveness.md
 │   │   ├── false_positive_analysis.md
 │   │   ├── rule_optimization.md
 │   │   └── compliance_gap_analysis.md
-│   └── waf_schema.json           # WAF log schema definition
-├── src/                          # Source code
-│   ├── fetchers/                # Data fetching modules
-│   ├── processors/              # Data processing modules
-│   ├── storage/                 # Database management
-│   ├── reporters/               # Report generation
-│   ├── utils/                   # Utility functions
-│   └── main.py                  # Main orchestration script
-├── data/{account_id}/            # Account-specific DuckDB files (auto-created)
-├── output/{account_id}/          # Account-specific Excel reports (auto-created)
-├── logs/{account_id}/            # Account-specific application logs (auto-created)
-├── exported-prompt/{account_id}/ # Filled prompts with WAF data (gitignored, auto-created)
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
+│   └── waf_schema.json                    # WAF log schema definition
+├── src/                                   # Source code
+│   ├── fetchers/                         # Data fetching modules
+│   ├── processors/                       # Data processing modules
+│   ├── storage/                          # Database management
+│   ├── reporters/                        # Report generation
+│   ├── utils/                            # Utility functions
+│   └── main.py                           # Main orchestration script
+├── data/{alias}_{account_id}/             # Account-specific DuckDB files (auto-created)
+├── output/{alias}_{account_id}/           # Account-specific Excel reports (auto-created)
+├── logs/{alias}_{account_id}/             # Account-specific application logs (auto-created)
+├── exported-prompt/{alias}_{account_id}/  # Filled prompts with WAF data (gitignored, auto-created)
+├── requirements.txt                       # Python dependencies
+└── README.md                              # This file
 ```
 
 ### System Architecture
@@ -526,7 +526,8 @@ You'll see an interactive menu:
    - Select log source: CloudWatch (auto-detected from database) or S3
    - CloudWatch log groups automatically discovered from Web ACL logging configurations
 4. Select **Option 4** to generate Excel report
-   - Reports saved as `{account_id}_{timestamp}_waf_report.xlsx`
+   - Choose specific Web ACL or all Web ACLs
+   - Reports saved as `{alias}_{account_id}_{timestamp}_waf_report.xlsx`
 5. Select **Option 0** to exit
 
 **Advantages of interactive mode:**
@@ -649,20 +650,26 @@ The tool automatically creates and uses the following account-specific directory
 
 ```
 aws-waf-review/
-├── data/{account_id}/        # Account-specific DuckDB files (auto-created)
-│   └── {account_id}_waf_analysis.duckdb
-├── output/{account_id}/      # Account-specific Excel reports (auto-created)
-│   └── {account_id}_20251107_123456_waf_report.xlsx
-├── logs/{account_id}/        # Account-specific application logs (auto-created)
-└── exported-prompt/{account_id}/  # Filled prompts with WAF data (auto-created, gitignored)
+├── data/{alias}_{account_id}/        # Account-specific DuckDB files (auto-created)
+│   └── {alias}_{account_id}_waf_analysis.duckdb
+├── output/{alias}_{account_id}/      # Account-specific Excel reports (auto-created)
+│   └── {alias}_{account_id}_20251107_123456_waf_report.xlsx
+├── logs/{alias}_{account_id}/        # Account-specific application logs (auto-created)
+└── exported-prompt/{alias}_{account_id}/  # Filled prompts with WAF data (auto-created, gitignored)
 ```
 
 **Multi-Account Organization:**
 - Each AWS account gets separate subdirectories for complete data isolation
-- Account ID automatically detected using AWS STS
-- Database files named with account ID prefix: `{account_id}_waf_analysis.duckdb`
-- Reports include account ID and timestamp: `{account_id}_{timestamp}_waf_report.xlsx`
+- Account ID and alias (if set) automatically detected using AWS STS and IAM
+- Directory naming format: `{alias}_{account_id}` (falls back to `{account_id}` if no alias)
+- Database files: `{alias}_{account_id}_waf_analysis.duckdb`
+- Reports: `{alias}_{account_id}_{timestamp}_waf_report.xlsx`
 - All generated files are excluded from git via `.gitignore`
+
+**Account Alias:**
+- AWS account alias (friendly name) is automatically fetched if configured
+- Requires `iam:ListAccountAliases` permission (gracefully handles denial)
+- Makes multi-account analysis more user-friendly with recognizable names
 
 ## Excel Report Structure
 
@@ -892,7 +899,12 @@ MIT License - See LICENSE file for details
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Version 1.1.0 (Current)
+### Version 1.2.0 (Current)
+- Account alias/name support with `{alias}_{account_id}` naming format
+- Web ACL selection for Excel report generation
+- Critical bug fixes: DuckDB DATE() function and auto-filename generation
+
+### Version 1.1.0
 - Multi-account support with organized directory structure
 - Enhanced time window selection (today, yesterday, week, custom)
 - Auto-detect CloudWatch log groups from Web ACL configurations

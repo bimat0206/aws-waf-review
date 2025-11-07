@@ -5,6 +5,27 @@ All notable changes to the AWS WAF Security Analysis Tool will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-11-07
+
+### Added
+
+#### Account Name/Alias Support
+- **AWS Account Alias Fetching**: Automatically fetches AWS account alias (friendly name) if configured
+- **Enhanced Naming**: Directory and file names use format `{alias}_{account_id}` when alias exists
+  - Database files: `data/{alias}_{account_id}/{alias}_{account_id}_waf_analysis.duckdb`
+  - Excel reports: `output/{alias}_{account_id}/{alias}_{account_id}_{timestamp}_waf_report.xlsx`
+  - Application logs: `logs/{alias}_{account_id}/`
+  - Exported prompts: `exported-prompt/{alias}_{account_id}/`
+- **Graceful Fallback**: If no alias set, uses account ID only: `{account_id}`
+- **IAM Permission**: Requires `iam:ListAccountAliases` permission (gracefully handles denial)
+
+### Changed
+
+#### Directory and File Naming
+- Updated naming convention from `{account_id}` to `{alias}_{account_id}` format
+- Makes multi-account analysis more user-friendly with recognizable names
+- Backward compatible: Falls back to account ID if alias not available
+
 ## [1.1.0] - 2025-11-07
 
 ### Added

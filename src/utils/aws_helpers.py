@@ -69,6 +69,38 @@ def get_account_id() -> Optional[str]:
         return None
 
 
+def get_account_alias() -> Optional[str]:
+    """
+    Get the AWS account alias (friendly name) if set.
+
+    Returns:
+        Optional[str]: AWS account alias or None if not set or unable to retrieve
+
+    Note:
+        Requires iam:ListAccountAliases permission.
+        If alias is not set or permission denied, returns None.
+    """
+    try:
+        iam_client = boto3.client('iam')
+        response = iam_client.list_account_aliases()
+        aliases = response.get('AccountAliases', [])
+
+        if aliases:
+            alias = aliases[0]  # AWS accounts can have only one alias
+            logger.info(f"AWS Account Alias: {alias}")
+            return alias
+        else:
+            logger.info("No account alias set for this AWS account")
+            return None
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        if error_code == 'AccessDenied':
+            logger.warning("Access denied when fetching account alias (iam:ListAccountAliases permission required)")
+        else:
+            logger.warning(f"Error getting account alias: {e}")
+        return None
+
+
 def verify_aws_credentials() -> bool:
     """
     Verify that AWS credentials are configured and valid.
@@ -224,12 +256,13 @@ def get_session_info() -> Dict[str, Any]:
     Get comprehensive information about the current AWS session.
 
     Returns:
-        Dict[str, Any]: Session information including profile, region, account ID, and identity
+        Dict[str, Any]: Session information including profile, region, account ID, alias, and identity
     """
     session_info = {
         'profile': get_current_aws_profile(),
         'region': get_current_region(),
         'account_id': get_account_id(),
+        'account_alias': get_account_alias(),
         'credentials_valid': verify_aws_credentials()
     }
 

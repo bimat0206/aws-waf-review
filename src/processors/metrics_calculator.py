@@ -20,15 +20,34 @@ class MetricsCalculator:
     Calculates security metrics and analytics from WAF data.
     """
 
-    def __init__(self, db_manager: DuckDBManager):
+    def __init__(self, db_manager: DuckDBManager, web_acl_ids: Optional[List[str]] = None):
         """
         Initialize the metrics calculator.
 
         Args:
             db_manager (DuckDBManager): Database manager instance
+            web_acl_ids (Optional[List[str]]): List of Web ACL IDs to filter by. If None, includes all Web ACLs.
         """
         self.db = db_manager
-        logger.info("Metrics calculator initialized")
+        self.web_acl_ids = web_acl_ids
+        if web_acl_ids:
+            logger.info(f"Metrics calculator initialized with filter for {len(web_acl_ids)} Web ACL(s)")
+        else:
+            logger.info("Metrics calculator initialized")
+
+    def _get_web_acl_filter(self) -> str:
+        """
+        Generate WHERE clause for filtering by Web ACL IDs.
+
+        Returns:
+            str: WHERE clause string (e.g., "WHERE web_acl_id IN ('id1', 'id2')") or empty string
+        """
+        if self.web_acl_ids:
+            # Escape single quotes in IDs and format as SQL IN clause
+            escaped_ids = [id.replace("'", "''") for id in self.web_acl_ids]
+            ids_str = "', '".join(escaped_ids)
+            return f"WHERE web_acl_id IN ('{ids_str}')"
+        return ""
 
     def calculate_all_metrics(self) -> Dict[str, Any]:
         """
@@ -65,25 +84,31 @@ class MetricsCalculator:
         logger.info("Calculating summary metrics...")
 
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
         # Total requests
-        result = conn.execute("SELECT COUNT(*) as total FROM waf_logs").fetchone()
+        query = f"SELECT COUNT(*) as total FROM waf_logs {web_acl_filter}"
+        result = conn.execute(query).fetchone()
         total_requests = result[0] if result else 0
 
         # Action counts
-        result = conn.execute("""
+        query = f"""
             SELECT action, COUNT(*) as count
             FROM waf_logs
+            {web_acl_filter}
             GROUP BY action
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         actions = {row[0]: row[1] for row in result}
 
         # Time range
-        result = conn.execute("""
+        query = f"""
             SELECT MIN(timestamp) as start, MAX(timestamp) as end
             FROM waf_logs
-        """).fetchone()
+            {web_acl_filter}
+        """
+        result = conn.execute(query).fetchone()
 
         time_range = None
         if result and result[0]:
@@ -93,19 +118,23 @@ class MetricsCalculator:
             }
 
         # Unique clients
-        result = conn.execute("""
+        where_clause = "WHERE client_ip IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND client_ip IS NOT NULL"
+        query = f"""
             SELECT COUNT(DISTINCT client_ip) as unique_ips
             FROM waf_logs
-            WHERE client_ip IS NOT NULL
-        """).fetchone()
+            {where_clause}
+        """
+        result = conn.execute(query).fetchone()
         unique_ips = result[0] if result else 0
 
         # Unique countries
-        result = conn.execute("""
+        where_clause = "WHERE country IS NOT NULL AND country != '-'" if not web_acl_filter else f"{web_acl_filter} AND country IS NOT NULL AND country != '-'"
+        query = f"""
             SELECT COUNT(DISTINCT country) as unique_countries
             FROM waf_logs
-            WHERE country IS NOT NULL AND country != '-'
-        """).fetchone()
+            {where_clause}
+        """
+        result = conn.execute(query).fetchone()
         unique_countries = result[0] if result else 0
 
         # Calculate block rate
@@ -133,13 +162,16 @@ class MetricsCalculator:
             Dict[str, Any]: Action distribution data
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute("""
+        query = f"""
             SELECT action, COUNT(*) as count
             FROM waf_logs
+            {web_acl_filter}
             GROUP BY action
             ORDER BY count DESC
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         total = sum(row[1] for row in result)
 
@@ -166,8 +198,11 @@ class MetricsCalculator:
         logger.info("Calculating rule effectiveness...")
 
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute("""
+        where_clause = "WHERE terminating_rule_id IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND terminating_rule_id IS NOT NULL"
+
+        query = f"""
             SELECT
                 terminating_rule_id,
                 terminating_rule_type,
@@ -177,10 +212,11 @@ class MetricsCalculator:
                 SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) as allows,
                 SUM(CASE WHEN action = 'COUNT' THEN 1 ELSE 0 END) as counts
             FROM waf_logs
-            WHERE terminating_rule_id IS NOT NULL
+            {where_clause}
             GROUP BY terminating_rule_id, terminating_rule_type
             ORDER BY hit_count DESC
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         total_requests = self.get_summary_metrics()['total_requests']
 
@@ -219,8 +255,11 @@ class MetricsCalculator:
             List[Dict[str, Any]]: Geographic distribution data
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute("""
+        where_clause = "WHERE country IS NOT NULL AND country != '-'" if not web_acl_filter else f"{web_acl_filter} AND country IS NOT NULL AND country != '-'"
+
+        query = f"""
             SELECT
                 country,
                 COUNT(*) as total_requests,
@@ -228,10 +267,11 @@ class MetricsCalculator:
                 SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) as allowed,
                 COUNT(DISTINCT client_ip) as unique_ips
             FROM waf_logs
-            WHERE country IS NOT NULL AND country != '-'
+            {where_clause}
             GROUP BY country
             ORDER BY total_requests DESC
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         countries = []
         for row in result:
@@ -265,8 +305,11 @@ class MetricsCalculator:
             List[Dict[str, Any]]: Top blocked IPs
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute(f"""
+        where_clause = "WHERE action = 'BLOCK' AND client_ip IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND action = 'BLOCK' AND client_ip IS NOT NULL"
+
+        query = f"""
             SELECT
                 client_ip,
                 country,
@@ -275,11 +318,12 @@ class MetricsCalculator:
                 MIN(timestamp) as first_seen,
                 MAX(timestamp) as last_seen
             FROM waf_logs
-            WHERE action = 'BLOCK' AND client_ip IS NOT NULL
+            {where_clause}
             GROUP BY client_ip, country
             ORDER BY block_count DESC
             LIMIT {limit}
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         ips = []
         for row in result:
@@ -400,16 +444,18 @@ class MetricsCalculator:
             pd.DataFrame: Daily traffic data
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        query = """
+        query = f"""
             SELECT
-                DATE(timestamp) as date,
+                CAST(timestamp AS DATE) as date,
                 COUNT(*) as total_requests,
                 SUM(CASE WHEN action = 'BLOCK' THEN 1 ELSE 0 END) as blocked,
                 SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) as allowed,
                 COUNT(DISTINCT client_ip) as unique_ips
             FROM waf_logs
-            GROUP BY DATE(timestamp)
+            {web_acl_filter}
+            GROUP BY CAST(timestamp AS DATE)
             ORDER BY date
         """
 
