@@ -15,6 +15,17 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder that handles datetime objects.
+    Converts datetime objects to ISO 8601 format strings.
+    """
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 class DuckDBManager:
     """
     Manages DuckDB database operations for WAF analysis.
@@ -370,19 +381,19 @@ class DuckDBManager:
                 entry.get('httpStatus'),
                 entry.get('terminatingRuleId'),
                 entry.get('terminatingRuleType'),
-                json.dumps(entry.get('terminatingRuleMatchDetails')),
-                json.dumps(entry.get('ruleGroupList', [])),
-                json.dumps(entry.get('rateBasedRuleList', [])),
-                json.dumps(entry.get('nonTerminatingMatchingRules', [])),
-                json.dumps(entry.get('labels', [])),
+                json.dumps(entry.get('terminatingRuleMatchDetails'), cls=DateTimeEncoder),
+                json.dumps(entry.get('ruleGroupList', []), cls=DateTimeEncoder),
+                json.dumps(entry.get('rateBasedRuleList', []), cls=DateTimeEncoder),
+                json.dumps(entry.get('nonTerminatingMatchingRules', []), cls=DateTimeEncoder),
+                json.dumps(entry.get('labels', []), cls=DateTimeEncoder),
                 entry.get('ja3Fingerprint'),
                 entry.get('ja4Fingerprint'),
                 entry.get('httpRequest', {}).get('headers', [{}])[0].get('value') if entry.get('httpRequest', {}).get('headers') else None,
-                json.dumps(entry.get('httpRequest', {}).get('headers', [])),
+                json.dumps(entry.get('httpRequest', {}).get('headers', []), cls=DateTimeEncoder),
                 entry.get('responseCodeSent'),
                 entry.get('httpSourceName'),
                 entry.get('httpSourceId'),
-                json.dumps(entry),
+                json.dumps(entry, cls=DateTimeEncoder),
                 datetime.utcnow()
             ])
 
