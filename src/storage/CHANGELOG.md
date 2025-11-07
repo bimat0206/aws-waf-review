@@ -2,6 +2,58 @@
 
 All notable changes to the storage module will be documented in this file.
 
+## [1.0.3] - 2025-11-07
+
+### Fixed
+
+#### DuckDB Manager (`duckdb_manager.py`)
+- **CRITICAL BUG FIX**: JSON serialization error when storing WAF logs with datetime objects
+  - Error: "TypeError: Object of type datetime is not JSON serializable"
+  - Occurs when log parser converts timestamps to datetime objects and database tries to serialize them
+  - Location: `insert_log_entries()` method at line 396 when doing `json.dumps(entry)`
+
+**Root Cause**:
+- Log parser (`processors.log_parser.py`) converts timestamp strings to datetime objects for normalization
+- Database insertion uses `json.dumps()` to serialize complex fields (ruleGroupList, labels, headers, full entry)
+- Python's default JSON encoder doesn't know how to serialize datetime objects
+- Results in TypeError when trying to store parsed logs in database
+
+**Impact**:
+- Logs could be fetched and parsed successfully (72 events in the error case)
+- But insertion into database would fail 100% of the time with datetime fields
+- No logs would be stored, making the tool completely broken for log analysis
+
+**Solution**:
+- Created custom `DateTimeEncoder(json.JSONEncoder)` class
+- Overrides `default()` method to convert datetime objects to ISO 8601 format strings
+- Updated all `json.dumps()` calls in `insert_log_entries()` to use `cls=DateTimeEncoder`
+- Affected fields:
+  - `terminatingRuleMatchDetails`
+  - `ruleGroupList`
+  - `rateBasedRuleList`
+  - `nonTerminatingMatchingRules`
+  - `labels`
+  - `httpRequest.headers`
+  - Full log entry (raw_log column)
+
+**Code Changes**:
+```python
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+# Usage
+json.dumps(entry, cls=DateTimeEncoder)
+```
+
+**Testing**:
+- Verified with CloudWatch logs containing 72 events
+- All events successfully parsed and stored in database
+- Datetime fields properly converted to ISO 8601 strings in JSON
+
 ## [1.0.2] - 2025-11-07
 
 ### Fixed
