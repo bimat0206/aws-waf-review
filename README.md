@@ -473,21 +473,59 @@ aws logs describe-log-groups --log-group-name-prefix aws-waf-logs
 
 ## Usage
 
-### Basic Usage
+### Interactive Mode (Default)
 
-Run the analyzer with default settings (3 months of logs, REGIONAL scope):
+Run the analyzer without arguments for a guided, menu-driven experience:
 
 ```bash
 python src/main.py
 ```
 
-The tool will:
-1. Verify AWS credentials
-2. Fetch WAF configurations
-3. Prompt you to select a log source (CloudWatch or S3)
-4. Fetch and parse logs
-5. Calculate security metrics
-6. Generate an Excel report
+You'll see an interactive menu:
+
+```
+🎯 What would you like to do?
+================================================================================
+1. Fetch WAF Configurations (Web ACLs, Rules, Resources)
+2. Fetch WAF Logs (CloudWatch or S3)
+3. View Current Inventory (Web ACLs and Resources)
+4. Generate Excel Report
+5. View Database Statistics
+0. Exit
+================================================================================
+```
+
+**Interactive workflow:**
+1. Select **Option 1** to fetch WAF configurations
+   - Choose scope: REGIONAL, CLOUDFRONT, or both
+   - View detailed inventory of Web ACLs and protected resources
+2. Select **Option 3** to review what was fetched
+3. Select **Option 2** to fetch logs
+   - Choose time window: 3 or 6 months
+   - Select log source: CloudWatch or S3
+4. Select **Option 4** to generate Excel report
+5. Select **Option 0** to exit
+
+**Advantages of interactive mode:**
+- No need to remember CLI arguments
+- Visual feedback with inventory display
+- Multiple operations in one session
+- Input validation and helpful prompts
+- Perfect for ad-hoc security analysis
+
+### Non-Interactive Mode (Scripting)
+
+For automation and CI/CD pipelines, provide all arguments:
+
+```bash
+python src/main.py \
+  --scope REGIONAL \
+  --log-source cloudwatch \
+  --log-group aws-waf-logs-myapp \
+  --months 6 \
+  --output report.xlsx \
+  --non-interactive
+```
 
 ### Command-Line Options
 
@@ -495,16 +533,17 @@ The tool will:
 python src/main.py [OPTIONS]
 
 Options:
-  --db-path PATH          Path to DuckDB database file (default: waf_analysis.duckdb)
-  --months {3,6}          Number of months of logs to analyze (default: 3)
-  --scope {REGIONAL,CLOUDFRONT}  WAF scope to analyze (default: REGIONAL)
+  --db-path PATH          Path to DuckDB database file (default: data/waf_analysis.duckdb)
+  --months {3,6}          Number of months of logs to analyze (3 or 6)
+  --scope {REGIONAL,CLOUDFRONT}  WAF scope to analyze
   --skip-config           Skip fetching WAF configurations
-  --skip-logs            Skip fetching logs
-  --log-source {cloudwatch,s3}  Log source
-  --log-group NAME       CloudWatch log group name
-  --s3-bucket NAME       S3 bucket name
-  --s3-prefix PREFIX     S3 key prefix
-  --output PATH          Output Excel report filename
+  --skip-logs             Skip fetching logs
+  --log-source {cloudwatch,s3}  Log source (cloudwatch or s3)
+  --log-group NAME        CloudWatch log group name
+  --s3-bucket NAME        S3 bucket name
+  --s3-prefix PREFIX      S3 key prefix
+  --output PATH           Output Excel report filename (default: output/waf_report_<timestamp>.xlsx)
+  --non-interactive       Run in non-interactive mode (no prompts)
 ```
 
 ### Example Usage Scenarios
@@ -529,6 +568,68 @@ python src/main.py --skip-config --skip-logs --output custom_report.xlsx
 ```bash
 python src/main.py --skip-logs
 ```
+
+**Interactive mode - view inventory first**:
+```bash
+python src/main.py
+# Select option 1: Fetch configurations
+# Select option 3: View inventory
+# Review Web ACLs, then decide on next steps
+```
+
+### Web ACL Inventory Display
+
+After fetching configurations in interactive mode, you'll see a detailed inventory:
+
+```
+================================================================================
+📋 Web ACL Inventory
+================================================================================
+
+1. Production-WebACL
+   Scope: REGIONAL
+   Default Action: ALLOW
+   Capacity: 1500 WCU
+   Rules: 12
+   Protected Resources: 3
+     - ALB: my-production-alb
+     - ALB: api-gateway-alb
+     - API_GATEWAY: my-rest-api
+   Logging: ✓ Enabled (CloudWatch)
+
+2. Staging-WebACL
+   Scope: REGIONAL
+   Default Action: ALLOW
+   Capacity: 800 WCU
+   Rules: 8
+   Protected Resources: 1
+     - ALB: staging-alb
+   Logging: ✗ Not configured
+
+================================================================================
+```
+
+**Inventory includes:**
+- Web ACL name, scope (REGIONAL/CLOUDFRONT), default action
+- WCU capacity usage
+- Number of rules configured
+- Protected resources with type and name
+- Logging status (enabled/disabled)
+
+### Directory Structure
+
+The tool automatically creates and uses the following directory structure:
+
+```
+aws-waf-review/
+├── data/                     # DuckDB database files (auto-created)
+│   └── waf_analysis.duckdb
+├── output/                   # Excel reports (auto-created)
+│   └── waf_report_20251107_123456.xlsx
+└── logs/                     # Application logs (future use, auto-created)
+```
+
+All generated files are excluded from git via `.gitignore`.
 
 ## Excel Report Structure
 
