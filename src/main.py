@@ -45,7 +45,23 @@ coloredlogs.install(
 )
 
 
-def setup_directories(account_id: str = None):
+def get_account_identifier(account_id: str, account_alias: Optional[str] = None) -> str:
+    """
+    Generate account identifier for directory and file naming.
+
+    Args:
+        account_id (str): AWS Account ID
+        account_alias (Optional[str]): AWS Account alias/name
+
+    Returns:
+        str: Account identifier in format "{alias}_{account_id}" or "{account_id}"
+    """
+    if account_alias:
+        return f"{account_alias}_{account_id}"
+    return account_id
+
+
+def setup_directories(account_id: str = None, account_alias: str = None):
     """
     Create necessary directories for the application.
 
@@ -53,29 +69,34 @@ def setup_directories(account_id: str = None):
 
     Args:
         account_id (str, optional): AWS Account ID for organizing data by account
+        account_alias (str, optional): AWS Account alias/name for friendly naming
 
     Creates:
-        - data/ or data/{account_id}/ : For DuckDB database files
-        - output/ or output/{account_id}/ : For Excel reports and exports
-        - logs/ or logs/{account_id}/ : For application logs
-        - exported-prompt/ or exported-prompt/{account_id}/ : For exported LLM prompts with WAF data
+        - data/ or data/{account_identifier}/ : For DuckDB database files
+        - output/ or output/{account_identifier}/ : For Excel reports and exports
+        - logs/ or logs/{account_identifier}/ : For application logs
+        - exported-prompt/ or exported-prompt/{account_identifier}/ : For exported LLM prompts with WAF data
 
     Note:
         - config/prompts/ contains prompt templates (version controlled)
         - exported-prompt/ contains filled prompts with account data (gitignored)
+        - account_identifier format: "{alias}_{account_id}" if alias exists, otherwise "{account_id}"
 
     Returns:
         dict: Dictionary containing created directory paths
     """
     if account_id:
+        # Generate account identifier with alias if available
+        account_identifier = get_account_identifier(account_id, account_alias)
+
         # Create account-specific subdirectories
         base_dirs = {
-            'data': f'data/{account_id}',
-            'output': f'output/{account_id}',
-            'logs': f'logs/{account_id}',
-            'exported_prompts': f'exported-prompt/{account_id}'
+            'data': f'data/{account_identifier}',
+            'output': f'output/{account_identifier}',
+            'logs': f'logs/{account_identifier}',
+            'exported_prompts': f'exported-prompt/{account_identifier}'
         }
-        logger.info(f"Setting up account-specific directories for AWS Account: {account_id}")
+        logger.info(f"Setting up account-specific directories for AWS Account: {account_identifier}")
     else:
         # Create root directories only
         base_dirs = {
@@ -126,7 +147,9 @@ def verify_environment():
     session_info = get_session_info()
     logger.info(f"AWS Profile: {session_info.get('profile', 'default')}")
     logger.info(f"AWS Region: {session_info.get('region')}")
-    logger.info(f"AWS Account: {session_info.get('account_id')}")
+    logger.info(f"AWS Account ID: {session_info.get('account_id')}")
+    if session_info.get('account_alias'):
+        logger.info(f"AWS Account Alias: {session_info.get('account_alias')}")
     logger.info(f"IAM Identity: {session_info.get('arn')}")
 
     return True
@@ -609,7 +632,7 @@ def main():
     parser.add_argument('--log-group', help='CloudWatch log group name')
     parser.add_argument('--s3-bucket', help='S3 bucket name')
     parser.add_argument('--s3-prefix', help='S3 key prefix')
-    parser.add_argument('--output', help='Output Excel report filename (default: output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx)')
+    parser.add_argument('--output', help='Output Excel report filename (default: output/{account_identifier}/{account_identifier}_{timestamp}_waf_report.xlsx)')
     parser.add_argument('--non-interactive', action='store_true',
                        help='Run in non-interactive mode (no prompts)')
 
@@ -623,16 +646,20 @@ def main():
     if not verify_environment():
         return 1
 
-    # Get AWS account ID for directory organization
+    # Get AWS account info for directory organization
     session_info = get_session_info()
     account_id = session_info.get('account_id')
+    account_alias = session_info.get('account_alias')
+
+    # Generate account identifier for naming
+    account_identifier = get_account_identifier(account_id, account_alias)
 
     # Setup account-specific directories
-    dir_paths = setup_directories(account_id)
+    dir_paths = setup_directories(account_id, account_alias)
 
     # Update database path if using default
     if args.db_path == 'data/waf_analysis.duckdb':
-        args.db_path = f"{dir_paths['data']}/{account_id}_waf_analysis.duckdb"
+        args.db_path = f"{dir_paths['data']}/{account_identifier}_waf_analysis.duckdb"
         logger.info(f"Using account-specific database: {args.db_path}")
 
     # Initialize database
@@ -779,7 +806,7 @@ def main():
 
                     # Auto-generate output filename
                     timestamp = format_datetime(datetime.now(), 'filename')
-                    output_path = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
+                    output_path = f"{dir_paths['output']}/{account_identifier}_{timestamp}_waf_report.xlsx"
 
                     # Get list of Web ACLs for selection
                     conn = db_manager.get_connection()
@@ -906,7 +933,7 @@ def main():
                 output_path = args.output
             else:
                 timestamp = format_datetime(datetime.now(), 'filename')
-                output_path = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
+                output_path = f"{dir_paths['output']}/{account_identifier}_{timestamp}_waf_report.xlsx"
 
             generate_excel_report(db_manager, output_path)
 
