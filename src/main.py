@@ -94,13 +94,123 @@ def verify_environment():
     return True
 
 
-def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL'):
+def display_web_acl_summary(db_manager: DuckDBManager):
+    """
+    Display summary of fetched Web ACLs and resources.
+
+    Args:
+        db_manager (DuckDBManager): Database manager instance
+    """
+    conn = db_manager.get_connection()
+
+    # Get Web ACLs
+    web_acls = conn.execute("""
+        SELECT web_acl_id, name, scope, default_action, capacity
+        FROM web_acls
+        ORDER BY scope, name
+    """).fetchall()
+
+    if not web_acls:
+        print("\n⚠️  No Web ACLs found in database")
+        return
+
+    print("\n" + "="*80)
+    print("📋 Web ACL Inventory")
+    print("="*80)
+
+    for idx, (acl_id, name, scope, default_action, capacity) in enumerate(web_acls, 1):
+        print(f"\n{idx}. {name}")
+        print(f"   Scope: {scope}")
+        print(f"   Default Action: {default_action}")
+        print(f"   Capacity: {capacity} WCU")
+
+        # Get rule count
+        rule_count = conn.execute("""
+            SELECT COUNT(*) FROM rules WHERE web_acl_id = ?
+        """, [acl_id]).fetchone()[0]
+        print(f"   Rules: {rule_count}")
+
+        # Get protected resources
+        resources = conn.execute("""
+            SELECT resource_arn, resource_type FROM resource_associations
+            WHERE web_acl_id = ?
+        """, [acl_id]).fetchall()
+
+        if resources:
+            print(f"   Protected Resources: {len(resources)}")
+            for resource_arn, resource_type in resources[:3]:  # Show first 3
+                # Extract resource name from ARN
+                resource_name = resource_arn.split('/')[-1] if '/' in resource_arn else resource_arn.split(':')[-1]
+                print(f"     - {resource_type}: {resource_name}")
+            if len(resources) > 3:
+                print(f"     ... and {len(resources) - 3} more")
+        else:
+            print(f"   Protected Resources: None")
+
+        # Check logging status
+        logging_config = conn.execute("""
+            SELECT destination_type FROM logging_configurations
+            WHERE web_acl_id = ?
+        """, [acl_id]).fetchone()
+
+        if logging_config:
+            print(f"   Logging: ✓ Enabled ({logging_config[0]})")
+        else:
+            print(f"   Logging: ✗ Not configured")
+
+    print("\n" + "="*80)
+
+
+def select_web_acls(db_manager: DuckDBManager):
+    """
+    Let user select which Web ACLs to analyze.
+
+    Args:
+        db_manager (DuckDBManager): Database manager instance
+
+    Returns:
+        list: List of selected Web ACL IDs, or None for all
+    """
+    conn = db_manager.get_connection()
+
+    web_acls = conn.execute("""
+        SELECT web_acl_id, name, scope FROM web_acls
+        ORDER BY scope, name
+    """).fetchall()
+
+    if not web_acls:
+        return None
+
+    print("\n📊 Select Web ACLs to analyze:")
+    print("0. Analyze ALL Web ACLs")
+    for idx, (acl_id, name, scope) in enumerate(web_acls, 1):
+        print(f"{idx}. {name} ({scope})")
+
+    while True:
+        selection = input("\nEnter selection (0 for all, or comma-separated numbers): ").strip()
+
+        if selection == '0':
+            return None  # Analyze all
+
+        try:
+            indices = [int(x.strip()) - 1 for x in selection.split(',')]
+            selected_ids = [web_acls[i][0] for i in indices if 0 <= i < len(web_acls)]
+            if selected_ids:
+                return selected_ids
+            else:
+                print("❌ Invalid selection. Please try again.")
+        except (ValueError, IndexError):
+            print("❌ Invalid input. Please enter numbers separated by commas.")
+
+
+def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL', interactive: bool = True):
     """
     Fetch WAF configurations and store in database.
 
     Args:
         db_manager (DuckDBManager): Database manager instance
         scope (str): WAF scope - 'REGIONAL' or 'CLOUDFRONT'
+        interactive (bool): Whether to show interactive prompts
     """
     logger.info(f"Fetching WAF configurations for {scope} scope...")
 
@@ -111,7 +221,7 @@ def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL')
 
     if not web_acl_configs:
         logger.warning(f"No Web ACLs found in {scope} scope")
-        return
+        return 0
 
     logger.info(f"Found {len(web_acl_configs)} Web ACLs")
 
@@ -141,6 +251,12 @@ def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL')
             db_manager.insert_logging_configuration(web_acl_id, logging_config)
 
     logger.info("WAF configurations stored successfully")
+
+    # Display summary if interactive
+    if interactive:
+        display_web_acl_summary(db_manager)
+
+    return len(web_acl_configs)
 
 
 def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
@@ -273,6 +389,78 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str):
     logger.info(f"Excel report generated: {output_path}")
 
 
+def interactive_menu(db_manager: DuckDBManager):
+    """
+    Display interactive menu for user actions.
+
+    Args:
+        db_manager (DuckDBManager): Database manager instance
+
+    Returns:
+        str: User's choice
+    """
+    print("\n" + "="*80)
+    print("🎯 What would you like to do?")
+    print("="*80)
+    print("1. Fetch WAF Configurations (Web ACLs, Rules, Resources)")
+    print("2. Fetch WAF Logs (CloudWatch or S3)")
+    print("3. View Current Inventory (Web ACLs and Resources)")
+    print("4. Generate Excel Report")
+    print("5. View Database Statistics")
+    print("0. Exit")
+    print("="*80)
+
+    choice = input("\nEnter your choice (0-5): ").strip()
+    return choice
+
+
+def interactive_scope_selection():
+    """
+    Let user select WAF scope interactively.
+
+    Returns:
+        list: List of scopes to fetch
+    """
+    print("\n📍 Select WAF Scope:")
+    print("1. REGIONAL (ALB, API Gateway)")
+    print("2. CLOUDFRONT (CloudFront distributions)")
+    print("3. Both REGIONAL and CLOUDFRONT")
+
+    while True:
+        choice = input("\nEnter choice (1-3): ").strip()
+
+        if choice == '1':
+            return ['REGIONAL']
+        elif choice == '2':
+            return ['CLOUDFRONT']
+        elif choice == '3':
+            return ['REGIONAL', 'CLOUDFRONT']
+        else:
+            print("❌ Invalid choice. Please enter 1, 2, or 3.")
+
+
+def interactive_time_window():
+    """
+    Let user select time window for log analysis.
+
+    Returns:
+        int: Number of months
+    """
+    print("\n⏰ Select time window for log analysis:")
+    print("1. Last 3 months (~90 days)")
+    print("2. Last 6 months (~180 days)")
+
+    while True:
+        choice = input("\nEnter choice (1 or 2): ").strip()
+
+        if choice == '1':
+            return 3
+        elif choice == '2':
+            return 6
+        else:
+            print("❌ Invalid choice. Please enter 1 or 2.")
+
+
 def main():
     """Main execution function."""
     print_banner()
@@ -281,9 +469,9 @@ def main():
     parser = argparse.ArgumentParser(description='AWS WAF Security Analysis Tool')
     parser.add_argument('--db-path', default='data/waf_analysis.duckdb',
                        help='Path to DuckDB database file (default: data/waf_analysis.duckdb)')
-    parser.add_argument('--months', type=int, default=3, choices=[3, 6],
+    parser.add_argument('--months', type=int, choices=[3, 6],
                        help='Number of months of logs to analyze (3 or 6)')
-    parser.add_argument('--scope', choices=['REGIONAL', 'CLOUDFRONT'], default='REGIONAL',
+    parser.add_argument('--scope', choices=['REGIONAL', 'CLOUDFRONT'],
                        help='WAF scope to analyze')
     parser.add_argument('--skip-config', action='store_true',
                        help='Skip fetching WAF configurations')
@@ -295,8 +483,14 @@ def main():
     parser.add_argument('--s3-bucket', help='S3 bucket name')
     parser.add_argument('--s3-prefix', help='S3 key prefix')
     parser.add_argument('--output', help='Output Excel report filename (default: output/waf_report_<timestamp>.xlsx)')
+    parser.add_argument('--non-interactive', action='store_true',
+                       help='Run in non-interactive mode (no prompts)')
 
     args = parser.parse_args()
+
+    # Determine if running in interactive mode
+    # Interactive if no scope/log-source specified and not explicitly disabled
+    interactive_mode = not args.non_interactive and (args.scope is None or args.log_source is None)
 
     # Setup directories
     setup_directories()
@@ -311,116 +505,192 @@ def main():
     db_manager.initialize_database()
 
     try:
-        # Fetch WAF configurations
-        if not args.skip_config:
-            fetch_waf_configurations(db_manager, scope=args.scope)
+        # Interactive mode: Menu-driven workflow
+        if interactive_mode:
+            while True:
+                choice = interactive_menu(db_manager)
 
-            # Also fetch CloudFront WAF ACLs if in us-east-1
-            if args.scope == 'REGIONAL' and get_current_region() == 'us-east-1':
-                response = input("Would you like to also fetch CloudFront WAF ACLs? (y/n): ")
-                if response.lower() == 'y':
-                    fetch_waf_configurations(db_manager, scope='CLOUDFRONT')
+                if choice == '0':
+                    # Exit
+                    logger.info("Exiting...")
+                    break
 
-        # Fetch logs
-        if not args.skip_logs:
-            # Get time window
-            start_time, end_time = get_time_window(args.months)
+                elif choice == '1':
+                    # Fetch WAF Configurations
+                    scopes = interactive_scope_selection()
+                    for scope in scopes:
+                        count = fetch_waf_configurations(db_manager, scope=scope, interactive=True)
+                        if count == 0 and scope == 'REGIONAL':
+                            logger.warning("No REGIONAL Web ACLs found")
 
-            if args.log_source == 'cloudwatch':
-                if not args.log_group:
-                    # List available log groups
-                    fetcher = CloudWatchFetcher()
-                    log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
+                elif choice == '2':
+                    # Fetch WAF Logs
+                    # First check if we have any Web ACLs
+                    stats = db_manager.get_database_stats()
+                    if stats.get('web_acls', 0) == 0:
+                        print("\n⚠️  No Web ACLs found in database.")
+                        print("Please fetch WAF configurations first (Option 1)")
+                        continue
 
-                    if log_groups:
-                        print("\nAvailable WAF log groups:")
-                        for idx, lg in enumerate(log_groups, 1):
-                            print(f"{idx}. {lg['logGroupName']}")
+                    # Select time window
+                    months = interactive_time_window()
+                    start_time, end_time = get_time_window(months)
 
-                        selection = input("\nEnter log group number or full name: ")
-                        try:
-                            idx = int(selection) - 1
-                            log_group_name = log_groups[idx]['logGroupName']
-                        except (ValueError, IndexError):
-                            log_group_name = selection
+                    # Select log source
+                    print("\n📦 Select log source:")
+                    print("1. CloudWatch Logs")
+                    print("2. S3")
+                    log_choice = input("\nEnter choice (1 or 2): ").strip()
+
+                    if log_choice == '1':
+                        # CloudWatch
+                        fetcher = CloudWatchFetcher()
+                        log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
+
+                        if log_groups:
+                            print("\n📋 Available WAF log groups:")
+                            for idx, lg in enumerate(log_groups, 1):
+                                print(f"{idx}. {lg['logGroupName']}")
+
+                            selection = input("\nEnter log group number or full name: ").strip()
+                            try:
+                                idx = int(selection) - 1
+                                log_group_name = log_groups[idx]['logGroupName']
+                            except (ValueError, IndexError):
+                                log_group_name = selection
+                        else:
+                            log_group_name = input("Enter CloudWatch log group name: ")
+
+                        fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+
+                    elif log_choice == '2':
+                        # S3
+                        bucket = input("\nEnter S3 bucket name: ")
+                        prefix = input("Enter S3 key prefix (or press Enter for root): ").strip() or ""
+
+                        fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time)
+
                     else:
-                        log_group_name = input("Enter CloudWatch log group name: ")
+                        print("❌ Invalid choice")
+
+                elif choice == '3':
+                    # View Current Inventory
+                    display_web_acl_summary(db_manager)
+
+                elif choice == '4':
+                    # Generate Excel Report
+                    stats = db_manager.get_database_stats()
+                    if stats.get('web_acls', 0) == 0:
+                        print("\n⚠️  No data found in database.")
+                        print("Please fetch WAF configurations first (Option 1)")
+                        continue
+
+                    # Ask for output filename
+                    timestamp = format_datetime(datetime.now(), 'filename')
+                    default_output = f"output/waf_report_{timestamp}.xlsx"
+                    output_path = input(f"\nEnter output filename (press Enter for '{default_output}'): ").strip()
+                    output_path = output_path or default_output
+
+                    generate_excel_report(db_manager, output_path)
+
+                    print(f"\n✓ Excel report generated: {output_path}")
+                    print("\nNext steps:")
+                    print("1. Review the Excel report for security insights")
+                    print("2. Use LLM prompt templates in config/prompts/ for AI analysis")
+                    print("3. Populate the 'LLM Recommendations' sheet with AI-generated insights")
+
+                elif choice == '5':
+                    # View Database Statistics
+                    stats = db_manager.get_database_stats()
+                    print("\n" + "="*80)
+                    print("📊 Database Statistics")
+                    print("="*80)
+                    for table, count in stats.items():
+                        print(f"{table:30s}: {count:>10,} records")
+                    print("="*80)
+
                 else:
-                    log_group_name = args.log_group
+                    print("❌ Invalid choice. Please enter 0-5.")
 
-                fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+        # Non-interactive mode: Traditional CLI workflow
+        else:
+            # Fetch WAF configurations
+            if not args.skip_config:
+                scope = args.scope or 'REGIONAL'
+                fetch_waf_configurations(db_manager, scope=scope, interactive=False)
 
-            elif args.log_source == 's3':
-                bucket = args.s3_bucket or input("Enter S3 bucket name: ")
-                prefix = args.s3_prefix or input("Enter S3 key prefix: ")
+                # Also fetch CloudFront if in us-east-1 and not explicitly specified
+                if scope == 'REGIONAL' and args.scope is None and get_current_region() == 'us-east-1':
+                    response = input("Would you like to also fetch CloudFront WAF ACLs? (y/n): ")
+                    if response.lower() == 'y':
+                        fetch_waf_configurations(db_manager, scope='CLOUDFRONT', interactive=False)
 
-                fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time)
+            # Fetch logs
+            if not args.skip_logs:
+                # Get time window
+                months = args.months or 3
+                start_time, end_time = get_time_window(months)
 
-            else:
-                # Ask user for log source
-                print("\nSelect log source:")
-                print("1. CloudWatch Logs")
-                print("2. S3")
-                choice = input("Enter choice (1 or 2): ")
+                if args.log_source == 'cloudwatch':
+                    if not args.log_group:
+                        # List available log groups
+                        fetcher = CloudWatchFetcher()
+                        log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
 
-                if choice == '1':
-                    # List available log groups
-                    fetcher = CloudWatchFetcher()
-                    log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
+                        if log_groups:
+                            print("\nAvailable WAF log groups:")
+                            for idx, lg in enumerate(log_groups, 1):
+                                print(f"{idx}. {lg['logGroupName']}")
 
-                    if log_groups:
-                        print("\nAvailable WAF log groups:")
-                        for idx, lg in enumerate(log_groups, 1):
-                            print(f"{idx}. {lg['logGroupName']}")
-
-                        selection = input("\nEnter log group number: ")
-                        try:
-                            idx = int(selection) - 1
-                            log_group_name = log_groups[idx]['logGroupName']
-                        except (ValueError, IndexError):
-                            logger.error("Invalid selection")
-                            return 1
+                            selection = input("\nEnter log group number or full name: ")
+                            try:
+                                idx = int(selection) - 1
+                                log_group_name = log_groups[idx]['logGroupName']
+                            except (ValueError, IndexError):
+                                log_group_name = selection
+                        else:
+                            log_group_name = input("Enter CloudWatch log group name: ")
                     else:
-                        log_group_name = input("Enter CloudWatch log group name: ")
+                        log_group_name = args.log_group
 
                     fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
 
-                elif choice == '2':
-                    bucket = input("Enter S3 bucket name: ")
-                    prefix = input("Enter S3 key prefix: ")
+                elif args.log_source == 's3':
+                    bucket = args.s3_bucket or input("Enter S3 bucket name: ")
+                    prefix = args.s3_prefix or input("Enter S3 key prefix: ")
 
                     fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time)
 
                 else:
-                    logger.error("Invalid choice")
+                    logger.error("Log source not specified. Use --log-source cloudwatch or --log-source s3")
                     return 1
 
-        # Show database statistics
-        stats = db_manager.get_database_stats()
-        logger.info("Database statistics:")
-        for table, count in stats.items():
-            logger.info(f"  {table}: {count:,} records")
+            # Show database statistics
+            stats = db_manager.get_database_stats()
+            logger.info("Database statistics:")
+            for table, count in stats.items():
+                logger.info(f"  {table}: {count:,} records")
 
-        # Generate Excel report
-        if args.output:
-            output_path = args.output
-        else:
-            timestamp = format_datetime(datetime.now(), 'filename')
-            output_path = f"output/waf_report_{timestamp}.xlsx"
+            # Generate Excel report
+            if args.output:
+                output_path = args.output
+            else:
+                timestamp = format_datetime(datetime.now(), 'filename')
+                output_path = f"output/waf_report_{timestamp}.xlsx"
 
-        generate_excel_report(db_manager, output_path)
+            generate_excel_report(db_manager, output_path)
 
-        # Show summary
-        print("\n" + "="*60)
-        print("Analysis Complete!")
-        print("="*60)
-        print(f"Database: {args.db_path}")
-        print(f"Excel Report: {output_path}")
-        print("\nNext steps:")
-        print("1. Review the Excel report for security insights")
-        print("2. Use LLM prompt templates in config/prompts/ for AI analysis")
-        print("3. Populate the 'LLM Recommendations' sheet with AI-generated insights")
-        print("="*60)
+            # Show summary
+            print("\n" + "="*60)
+            print("Analysis Complete!")
+            print("="*60)
+            print(f"Database: {args.db_path}")
+            print(f"Excel Report: {output_path}")
+            print("\nNext steps:")
+            print("1. Review the Excel report for security insights")
+            print("2. Use LLM prompt templates in config/prompts/ for AI analysis")
+            print("3. Populate the 'LLM Recommendations' sheet with AI-generated insights")
+            print("="*60)
 
         return 0
 
