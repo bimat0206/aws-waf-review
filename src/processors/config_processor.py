@@ -129,52 +129,57 @@ class WAFConfigProcessor:
         Returns:
             List[str]: List of resource ARNs
         """
-        logger.debug(f"Fetching resources for Web ACL: {web_acl_arn}")
+        logger.info(f"Fetching resources for Web ACL: {web_acl_arn}")
 
         try:
             resources = []
-            next_marker = None
+            resource_types_to_check = []
 
-            while True:
-                kwargs = {
-                    'WebACLArn': web_acl_arn,
-                    'ResourceType': 'APPLICATION_LOAD_BALANCER'
-                }
+            # Determine which resource types to check based on scope
+            if self.scope == 'REGIONAL':
+                resource_types_to_check = ['APPLICATION_LOAD_BALANCER', 'API_GATEWAY', 'APPSYNC', 'COGNITO_USER_POOL', 'APP_RUNNER_SERVICE', 'VERIFIED_ACCESS_INSTANCE']
+            elif self.scope == 'CLOUDFRONT':
+                resource_types_to_check = ['CLOUDFRONT']
 
-                if next_marker:
-                    kwargs['NextMarker'] = next_marker
-
-                response = self.client.list_resources_for_web_acl(**kwargs)
-                resources.extend(response.get('ResourceArns', []))
-
-                next_marker = response.get('NextMarker')
-                if not next_marker:
-                    break
-
-            # Also check for API Gateway resources
-            try:
-                kwargs = {
-                    'WebACLArn': web_acl_arn,
-                    'ResourceType': 'API_GATEWAY'
-                }
-                response = self.client.list_resources_for_web_acl(**kwargs)
-                resources.extend(response.get('ResourceArns', []))
-            except ClientError:
-                pass  # API Gateway might not be available in this region
-
-            # For CloudFront, check CLOUDFRONT resource type
-            if self.scope == 'CLOUDFRONT':
+            for resource_type in resource_types_to_check:
                 try:
-                    kwargs = {
-                        'WebACLArn': web_acl_arn,
-                        'ResourceType': 'CLOUDFRONT'
-                    }
-                    response = self.client.list_resources_for_web_acl(**kwargs)
-                    resources.extend(response.get('ResourceArns', []))
-                except ClientError:
-                    pass
+                    logger.debug(f"Checking resource type: {resource_type}")
+                    next_marker = None
 
-            logger.debug(f"Found {len(resources)} resources for Web ACL")
+                    while True:
+                        kwargs = {
+                            'WebACLArn': web_acl_arn,
+                            'ResourceType': resource_type
+                        }
+
+                        if next_marker:
+                            kwargs['NextMarker'] = next_marker
+
+                        response = self.client.list_resources_for_web_acl(**kwargs)
+                        resource_arns = response.get('ResourceArns', [])
+
+                        if resource_arns:
+                            logger.info(f"Found {len(resource_arns)} resources of type {resource_type}")
+                            resources.extend(resource_arns)
+
+                        next_marker = response.get('NextMarker')
+                        if not next_marker:
+                            break
+
+                except ClientError as e:
+                    error_code = e.response.get('Error', {}).get('Code')
+                    if error_code in ['WAFInvalidParameterException', 'ValidationException']:
+                        # Resource type not supported in this region/scope, skip it
+                        logger.debug(f"Resource type {resource_type} not supported, skipping")
+                    else:
+                        logger.warning(f"Error fetching {resource_type} resources: {e}")
+
+            if resources:
+                logger.info(f"Total: Found {len(resources)} resources for Web ACL")
+            else:
+                logger.warning(f"No resources found for Web ACL {web_acl_arn}")
+                logger.info("This is normal if the Web ACL is not yet associated with any resources")
+
             return resources
 
         except ClientError as e:

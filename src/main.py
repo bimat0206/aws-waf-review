@@ -22,6 +22,7 @@ from processors.config_processor import WAFConfigProcessor
 from processors.log_parser import WAFLogParser
 from processors.metrics_calculator import MetricsCalculator
 from reporters.excel_generator import ExcelReportGenerator
+from reporters.prompt_exporter import PromptExporter
 from utils.aws_helpers import (
     verify_aws_credentials,
     get_session_info,
@@ -456,11 +457,42 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
                                      'destination_arn', 'log_format', 'sampling_rate',
                                      'redacted_fields', 'created_at'], row)) for row in logging_configs]
 
-    # Generate report
+    # Get rules
+    rules = conn.execute(f"SELECT * FROM rules {web_acl_filter}").fetchall()
+    rules_list = [dict(zip(['rule_id', 'web_acl_id', 'name', 'priority', 'rule_type', 'action',
+                            'statement', 'visibility_config', 'override_action', 'created_at', 'updated_at'], row)) for row in rules]
+
+    # Group rules by Web ACL
+    rules_by_web_acl = {}
+    for rule in rules_list:
+        web_acl_id = rule.get('web_acl_id')
+        if web_acl_id not in rules_by_web_acl:
+            rules_by_web_acl[web_acl_id] = []
+        rules_by_web_acl[web_acl_id].append(rule)
+
+    # Generate Excel report
     generator = ExcelReportGenerator(output_path)
-    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list)
+    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list, rules_by_web_acl)
 
     logger.info(f"Excel report generated: {output_path}")
+
+    # Export LLM prompts with injected data
+    try:
+        # Determine export directory based on account
+        session_info = get_session_info()
+        account_id = session_info.get('account_id')
+        account_alias = session_info.get('account_alias')
+        account_identifier = get_account_identifier(account_id, account_alias)
+
+        prompt_export_dir = f"exported-prompt/{account_identifier}"
+
+        exporter = PromptExporter()
+        prompt_count = exporter.export_all_prompts(
+            metrics, web_acls_list, resources_list, rules_by_web_acl, prompt_export_dir
+        )
+        logger.info(f"Exported {prompt_count} LLM prompts to: {prompt_export_dir}")
+    except Exception as e:
+        logger.warning(f"Failed to export prompts: {e}")
 
 
 def interactive_menu(db_manager: DuckDBManager):
