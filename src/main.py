@@ -415,8 +415,11 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
         account_alias = session_info.get('account_alias')
         account_identifier = get_account_identifier(account_id, account_alias)
 
-        # Export to output directory with account identifier
-        output_dir = f"output/{account_identifier}/raw_logs"
+        # Export to raw-logs directory (use provided path or default)
+        if raw_logs_dir:
+            output_dir = raw_logs_dir
+        else:
+            output_dir = f"raw-logs"
 
         logger.info("📦 Exporting raw CloudWatch logs...")
         exporter = RawLogsExporter()
@@ -894,7 +897,7 @@ def main():
                             log_group_name,
                             start_time,
                             end_time,
-                            raw_logs_dir=dir_paths.get('raw_logs'),
+                            raw_logs_dir='raw-logs',
                             region=log_group_region
                         )
 
@@ -903,7 +906,7 @@ def main():
                         bucket = input("\nEnter S3 bucket name: ")
                         prefix = input("Enter S3 key prefix (or press Enter for root): ").strip() or ""
 
-                        fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, dir_paths.get('raw_logs'))
+                        fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, 'raw-logs')
 
                     else:
                         print("❌ Invalid choice")
@@ -922,7 +925,7 @@ def main():
 
                     # Auto-generate output filename
                     timestamp = format_datetime(datetime.now(), 'filename')
-                    output_path = f"{dir_paths['output']}/{account_identifier}_{timestamp}_waf_report.xlsx"
+                    output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
 
                     # Get list of Web ACLs for selection
                     conn = db_manager.get_connection()
@@ -1032,7 +1035,7 @@ def main():
                     bucket = args.s3_bucket or input("Enter S3 bucket name: ")
                     prefix = args.s3_prefix or input("Enter S3 key prefix: ")
 
-                    fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, dir_paths.get('raw_logs'))
+                    fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, 'raw-logs')
 
                 else:
                     logger.error("Log source not specified. Use --log-source cloudwatch or --log-source s3")
@@ -1049,7 +1052,7 @@ def main():
                 output_path = args.output
             else:
                 timestamp = format_datetime(datetime.now(), 'filename')
-                output_path = f"{dir_paths['output']}/{account_identifier}_{timestamp}_waf_report.xlsx"
+                output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
 
             generate_excel_report(db_manager, output_path)
 
