@@ -29,7 +29,11 @@ from utils.aws_helpers import (
 from utils.time_helpers import (
     get_time_window,
     format_datetime,
-    get_time_window_description
+    get_time_window_description,
+    get_today_window,
+    get_yesterday_window,
+    get_past_week_window,
+    get_custom_window
 )
 
 # Setup logging
@@ -414,6 +418,51 @@ def interactive_menu(db_manager: DuckDBManager):
     return choice
 
 
+def get_cloudwatch_log_groups_from_db(db_manager: DuckDBManager):
+    """
+    Extract CloudWatch log group names from logging configurations in the database.
+
+    Args:
+        db_manager (DuckDBManager): Database manager instance
+
+    Returns:
+        list: List of tuples (log_group_name, web_acl_name, web_acl_id)
+    """
+    conn = db_manager.get_connection()
+
+    # Query logging configurations for CloudWatch destinations
+    results = conn.execute("""
+        SELECT
+            lc.destination_arn,
+            lc.web_acl_id,
+            wa.name as web_acl_name
+        FROM logging_configurations lc
+        JOIN web_acls wa ON lc.web_acl_id = wa.web_acl_id
+        WHERE lc.destination_type = 'CLOUDWATCH'
+        ORDER BY wa.name
+    """).fetchall()
+
+    log_groups = []
+    for dest_arn, web_acl_id, web_acl_name in results:
+        # Parse CloudWatch log group ARN
+        # Format: arn:aws:logs:region:account-id:log-group:log-group-name:*
+        # or: arn:aws:logs:region:account-id:log-group:log-group-name
+        try:
+            # Extract log group name from ARN
+            # Split by ':log-group:' and take the second part
+            if ':log-group:' in dest_arn:
+                log_group_part = dest_arn.split(':log-group:')[1]
+                # Remove trailing ':*' if present
+                log_group_name = log_group_part.rstrip(':*')
+                log_groups.append((log_group_name, web_acl_name, web_acl_id))
+            else:
+                logger.warning(f"Could not parse log group from ARN: {dest_arn}")
+        except Exception as e:
+            logger.error(f"Error parsing CloudWatch ARN {dest_arn}: {e}")
+
+    return log_groups
+
+
 def interactive_scope_selection():
     """
     Let user select WAF scope interactively.
@@ -444,21 +493,50 @@ def interactive_time_window():
     Let user select time window for log analysis.
 
     Returns:
-        int: Number of months
+        Tuple[datetime, datetime]: (start_time, end_time) as UTC datetime objects
     """
     print("\n⏰ Select time window for log analysis:")
-    print("1. Last 3 months (~90 days)")
-    print("2. Last 6 months (~180 days)")
+    print("1. Today (since midnight UTC)")
+    print("2. Yesterday (full 24 hours)")
+    print("3. Past week (last 7 days)")
+    print("4. Past 3 months (~90 days)")
+    print("5. Past 6 months (~180 days)")
+    print("6. Custom date range")
 
     while True:
-        choice = input("\nEnter choice (1 or 2): ").strip()
+        choice = input("\nEnter choice (1-6): ").strip()
 
         if choice == '1':
-            return 3
+            return get_today_window()
         elif choice == '2':
-            return 6
+            return get_yesterday_window()
+        elif choice == '3':
+            return get_past_week_window()
+        elif choice == '4':
+            return get_time_window(3)
+        elif choice == '5':
+            return get_time_window(6)
+        elif choice == '6':
+            # Custom range
+            print("\nEnter custom date range:")
+            print("Supported formats: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS")
+            print("Example: 2024-01-01 or 2024-01-01 12:00:00")
+
+            while True:
+                try:
+                    start_date = input("Start date: ").strip()
+                    end_date = input("End date: ").strip()
+
+                    if not start_date or not end_date:
+                        print("❌ Both start and end dates are required")
+                        continue
+
+                    return get_custom_window(start_date, end_date)
+                except ValueError as e:
+                    print(f"❌ {e}")
+                    print("Please try again or press Ctrl+C to cancel")
         else:
-            print("❌ Invalid choice. Please enter 1 or 2.")
+            print("❌ Invalid choice. Please enter 1-6.")
 
 
 def main():
@@ -533,8 +611,7 @@ def main():
                         continue
 
                     # Select time window
-                    months = interactive_time_window()
-                    start_time, end_time = get_time_window(months)
+                    start_time, end_time = interactive_time_window()
 
                     # Select log source
                     print("\n📦 Select log source:")
@@ -543,23 +620,49 @@ def main():
                     log_choice = input("\nEnter choice (1 or 2): ").strip()
 
                     if log_choice == '1':
-                        # CloudWatch
-                        fetcher = CloudWatchFetcher()
-                        log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
+                        # CloudWatch - First try to get log groups from database
+                        db_log_groups = get_cloudwatch_log_groups_from_db(db_manager)
 
-                        if log_groups:
-                            print("\n📋 Available WAF log groups:")
-                            for idx, lg in enumerate(log_groups, 1):
-                                print(f"{idx}. {lg['logGroupName']}")
+                        if db_log_groups:
+                            print("\n📋 CloudWatch log groups from Web ACL configurations:")
+                            for idx, (log_group_name, web_acl_name, web_acl_id) in enumerate(db_log_groups, 1):
+                                print(f"{idx}. {log_group_name}")
+                                print(f"    Web ACL: {web_acl_name}")
 
-                            selection = input("\nEnter log group number or full name: ").strip()
+                            print(f"{len(db_log_groups) + 1}. Enter a different log group name")
+
+                            selection = input(f"\nEnter choice (1-{len(db_log_groups) + 1}): ").strip()
                             try:
                                 idx = int(selection) - 1
-                                log_group_name = log_groups[idx]['logGroupName']
-                            except (ValueError, IndexError):
+                                if 0 <= idx < len(db_log_groups):
+                                    log_group_name = db_log_groups[idx][0]
+                                else:
+                                    # Manual entry
+                                    log_group_name = input("Enter CloudWatch log group name: ")
+                            except ValueError:
+                                # Try to use it as log group name directly
                                 log_group_name = selection
                         else:
-                            log_group_name = input("Enter CloudWatch log group name: ")
+                            # Fallback: Query CloudWatch API for log groups
+                            print("\n💡 No CloudWatch log groups found in database configurations.")
+                            print("Querying CloudWatch API for available log groups...")
+
+                            fetcher = CloudWatchFetcher()
+                            api_log_groups = fetcher.list_log_groups(prefix='aws-waf-logs')
+
+                            if api_log_groups:
+                                print("\n📋 Available WAF log groups from CloudWatch:")
+                                for idx, lg in enumerate(api_log_groups, 1):
+                                    print(f"{idx}. {lg['logGroupName']}")
+
+                                selection = input("\nEnter log group number or full name: ").strip()
+                                try:
+                                    idx = int(selection) - 1
+                                    log_group_name = api_log_groups[idx]['logGroupName']
+                                except (ValueError, IndexError):
+                                    log_group_name = selection
+                            else:
+                                log_group_name = input("Enter CloudWatch log group name: ")
 
                         fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
 

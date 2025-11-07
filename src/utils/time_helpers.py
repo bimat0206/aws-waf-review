@@ -285,3 +285,85 @@ def today_utc() -> datetime:
     """
     now = datetime.now(timezone.utc)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_today_window() -> Tuple[datetime, datetime]:
+    """
+    Get time window for today (from midnight UTC to now).
+
+    Returns:
+        Tuple[datetime, datetime]: (start_time, end_time) as UTC datetime objects
+    """
+    end_time = datetime.now(timezone.utc)
+    start_time = today_utc()
+
+    logger.info(f"Today's window: {start_time.isoformat()} to {end_time.isoformat()}")
+    return start_time, end_time
+
+
+def get_yesterday_window() -> Tuple[datetime, datetime]:
+    """
+    Get time window for yesterday (full 24 hours).
+
+    Returns:
+        Tuple[datetime, datetime]: (start_time, end_time) as UTC datetime objects
+    """
+    today_start = today_utc()
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_end = today_start - timedelta(microseconds=1)
+
+    logger.info(f"Yesterday's window: {yesterday_start.isoformat()} to {yesterday_end.isoformat()}")
+    return yesterday_start, yesterday_end
+
+
+def get_past_week_window() -> Tuple[datetime, datetime]:
+    """
+    Get time window for the past 7 days.
+
+    Returns:
+        Tuple[datetime, datetime]: (start_time, end_time) as UTC datetime objects
+    """
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(days=7)
+
+    logger.info(f"Past week window: {start_time.isoformat()} to {end_time.isoformat()}")
+    return start_time, end_time
+
+
+def get_custom_window(start_date_str: str, end_date_str: str) -> Tuple[datetime, datetime]:
+    """
+    Parse custom date range from user input strings.
+
+    Args:
+        start_date_str (str): Start date (formats: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, ISO 8601)
+        end_date_str (str): End date (formats: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, ISO 8601)
+
+    Returns:
+        Tuple[datetime, datetime]: (start_time, end_time) as UTC datetime objects
+
+    Raises:
+        ValueError: If date parsing fails or end_time is before start_time
+    """
+    try:
+        # Parse start date
+        start_time = date_parser.parse(start_date_str)
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+            logger.warning(f"Start date was timezone-naive, assumed UTC")
+
+        # Parse end date
+        end_time = date_parser.parse(end_date_str)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+            logger.warning(f"End date was timezone-naive, assumed UTC")
+
+        # Validate
+        if end_time < start_time:
+            raise ValueError("End date must be after start date")
+
+        logger.info(f"Custom window: {start_time.isoformat()} to {end_time.isoformat()}")
+        return start_time, end_time
+
+    except Exception as e:
+        logger.error(f"Failed to parse custom date range: {e}")
+        raise ValueError(f"Invalid date format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format. Error: {e}")

@@ -2,6 +2,89 @@
 
 All notable changes to the utils module will be documented in this file.
 
+## [1.1.0] - 2025-11-07
+
+### Added
+
+#### Time Helpers (`time_helpers.py`) - Enhanced Time Window Options
+- `get_today_window()` - Get time window for today (midnight UTC to now)
+- `get_yesterday_window()` - Get time window for yesterday (full 24 hours)
+- `get_past_week_window()` - Get time window for the past 7 days
+- `get_custom_window(start_date_str, end_date_str)` - Parse custom date range from user input
+
+#### New Features
+- **Today Analysis**: Analyze WAF logs from midnight UTC to current time
+- **Yesterday Analysis**: Analyze full 24-hour period for previous day
+- **Past Week Analysis**: Analyze last 7 days of WAF logs
+- **Custom Range Analysis**: User-specified start and end dates
+- **Flexible Date Parsing**: Supports YYYY-MM-DD and YYYY-MM-DD HH:MM:SS formats
+- **Date Validation**: Ensures end date is after start date
+- **Error Handling**: Clear error messages for invalid date formats
+
+#### Technical Details
+- All new functions return `Tuple[datetime, datetime]` for consistency
+- All datetimes are timezone-aware (UTC)
+- `get_today_window()` uses `today_utc()` for consistent midnight calculation
+- `get_yesterday_window()` ensures full 24-hour period with microsecond precision
+- `get_custom_window()` uses `dateutil.parser` for flexible date parsing
+- Naive datetimes automatically converted to UTC with warning
+
+### Changed
+
+#### Backward Compatibility
+- Existing `get_time_window(months)` function unchanged
+- All existing code continues to work without modification
+- New functions follow same return type pattern `(start_time, end_time)`
+
+### Usage Examples
+
+#### Today's Logs
+```python
+from utils.time_helpers import get_today_window
+
+start_time, end_time = get_today_window()
+# Returns: (2025-11-07 00:00:00+00:00, 2025-11-07 09:46:12+00:00)
+```
+
+#### Yesterday's Logs
+```python
+from utils.time_helpers import get_yesterday_window
+
+start_time, end_time = get_yesterday_window()
+# Returns: (2025-11-06 00:00:00+00:00, 2025-11-06 23:59:59+00:00)
+```
+
+#### Past Week
+```python
+from utils.time_helpers import get_past_week_window
+
+start_time, end_time = get_past_week_window()
+# Returns: (2025-10-31 09:46:12+00:00, 2025-11-07 09:46:12+00:00)
+```
+
+#### Custom Date Range
+```python
+from utils.time_helpers import get_custom_window
+
+# Date only
+start_time, end_time = get_custom_window("2024-01-01", "2024-01-31")
+
+# Date and time
+start_time, end_time = get_custom_window(
+    "2024-01-01 12:00:00",
+    "2024-01-31 18:00:00"
+)
+```
+
+#### Error Handling
+```python
+try:
+    start, end = get_custom_window("2024-12-31", "2024-01-01")
+except ValueError as e:
+    print(f"Invalid date range: {e}")
+    # Output: Invalid date range: End date must be after start date
+```
+
 ## [1.0.0] - 2025-11-07
 
 ### Added
