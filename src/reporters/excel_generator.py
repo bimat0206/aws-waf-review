@@ -50,7 +50,8 @@ class ExcelReportGenerator:
         logger.info(f"Excel report generator initialized: {output_path}")
 
     def generate_report(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]],
-                       resources: List[Dict[str, Any]], logging_configs: List[Dict[str, Any]]) -> None:
+                       resources: List[Dict[str, Any]], logging_configs: List[Dict[str, Any]],
+                       rules_by_web_acl: Dict[str, List[Dict[str, Any]]] = None) -> None:
         """
         Generate the complete Excel report.
 
@@ -59,12 +60,16 @@ class ExcelReportGenerator:
             web_acls (List[Dict[str, Any]]): Web ACL configurations
             resources (List[Dict[str, Any]]): Resource associations
             logging_configs (List[Dict[str, Any]]): Logging configurations
+            rules_by_web_acl (Dict[str, List[Dict[str, Any]]]): Rules grouped by Web ACL ID
         """
         logger.info("Generating Excel report...")
 
+        if rules_by_web_acl is None:
+            rules_by_web_acl = {}
+
         # Create all sheets
-        self.create_inventory_sheet(web_acls, resources, logging_configs)
-        self.create_executive_summary_sheet(metrics)
+        self.create_executive_summary_sheet(metrics, web_acls)
+        self.create_inventory_sheet(web_acls, resources, logging_configs, rules_by_web_acl)
         self.create_traffic_analysis_sheet(metrics)
         self.create_rule_effectiveness_sheet(metrics)
         self.create_client_analysis_sheet(metrics)
@@ -77,9 +82,10 @@ class ExcelReportGenerator:
 
     def create_inventory_sheet(self, web_acls: List[Dict[str, Any]],
                                resources: List[Dict[str, Any]],
-                               logging_configs: List[Dict[str, Any]]) -> None:
+                               logging_configs: List[Dict[str, Any]],
+                               rules_by_web_acl: Dict[str, List[Dict[str, Any]]]) -> None:
         """
-        Create the Inventory sheet.
+        Create the Inventory sheet with Web ACLs, resources, and rules.
         """
         logger.info("Creating Inventory sheet...")
 
@@ -88,7 +94,7 @@ class ExcelReportGenerator:
         # Title
         ws['A1'] = 'AWS WAF Inventory'
         ws['A1'].font = Font(bold=True, size=16)
-        ws.merge_cells('A1:F1')
+        ws.merge_cells('A1:H1')
 
         # Web ACLs section
         row = 3
@@ -97,7 +103,7 @@ class ExcelReportGenerator:
         row += 1
 
         # Headers
-        headers = ['Name', 'ID', 'Scope', 'Default Action', 'Capacity', 'Logging Enabled']
+        headers = ['Name', 'ID', 'Scope', 'Default Action', 'Capacity', 'Rules Count', 'Resources Count', 'Logging']
         for col, header in enumerate(headers, start=1):
             cell = ws.cell(row=row, column=col)
             cell.value = header
@@ -109,28 +115,106 @@ class ExcelReportGenerator:
 
         # Data
         logging_config_ids = {lc.get('web_acl_id') for lc in logging_configs if lc.get('web_acl_id')}
+        resources_count = {}
+        for resource in resources:
+            web_acl_id = resource.get('web_acl_id')
+            if web_acl_id:
+                resources_count[web_acl_id] = resources_count.get(web_acl_id, 0) + 1
 
         for acl in web_acls:
-            ws[f'A{row}'] = acl.get('Name', '')
-            ws[f'B{row}'] = acl.get('Id', '')
-            ws[f'C{row}'] = acl.get('Scope', '')
+            acl_id = acl.get('web_acl_id', acl.get('Id', ''))
+            acl_name = acl.get('name', acl.get('Name', ''))
 
-            default_action = acl.get('DefaultAction', {})
-            action_str = 'ALLOW' if 'Allow' in default_action else 'BLOCK'
+            ws[f'A{row}'] = acl_name
+            ws[f'B{row}'] = acl_id
+            ws[f'C{row}'] = acl.get('scope', acl.get('Scope', ''))
+
+            default_action = acl.get('default_action', acl.get('DefaultAction', {}))
+            if isinstance(default_action, str):
+                action_str = default_action
+            else:
+                action_str = 'ALLOW' if 'Allow' in default_action else 'BLOCK'
             ws[f'D{row}'] = action_str
 
-            ws[f'E{row}'] = acl.get('Capacity', 0)
+            ws[f'E{row}'] = acl.get('capacity', acl.get('Capacity', 0))
 
-            acl_id = acl.get('Id', '')
+            # Rules count
+            rules_count = len(rules_by_web_acl.get(acl_id, []))
+            ws[f'F{row}'] = rules_count
+
+            # Resources count
+            ws[f'G{row}'] = resources_count.get(acl_id, 0)
+
+            # Logging status
             logging_enabled = 'Yes' if acl_id in logging_config_ids else 'No'
-            ws[f'F{row}'] = logging_enabled
+            ws[f'H{row}'] = logging_enabled
 
             # Color code logging status
             if logging_enabled == 'No':
-                ws[f'F{row}'].fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+                ws[f'H{row}'].fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
             else:
-                ws[f'F{row}'].fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+                ws[f'H{row}'].fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
 
+            row += 1
+
+        # Rules section (detailed view)
+        row += 2
+        ws[f'A{row}'] = 'Rules and Rule Groups'
+        ws[f'A{row}'].font = self.title_font
+        row += 1
+
+        # Headers
+        headers = ['Web ACL', 'Rule Name', 'Priority', 'Type', 'Action']
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = header
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal='center')
+
+        row += 1
+
+        # Get Web ACL names mapping
+        web_acl_names = {acl.get('web_acl_id', acl.get('Id', '')): acl.get('name', acl.get('Name', '')) for acl in web_acls}
+
+        # Data - rules sorted by Web ACL and priority
+        all_rules = []
+        for web_acl_id, rules in rules_by_web_acl.items():
+            for rule in rules:
+                all_rules.append({
+                    'web_acl_name': web_acl_names.get(web_acl_id, web_acl_id),
+                    'rule': rule
+                })
+
+        # Sort by Web ACL name and priority
+        all_rules.sort(key=lambda x: (x['web_acl_name'], x['rule'].get('priority', 0)))
+
+        for item in all_rules:
+            rule = item['rule']
+            ws[f'A{row}'] = item['web_acl_name']
+            ws[f'B{row}'] = rule.get('name', '')
+            ws[f'C{row}'] = rule.get('priority', '')
+            ws[f'D{row}'] = rule.get('rule_type', '')
+
+            # Parse action from JSON string if needed
+            action = rule.get('action', '')
+            if isinstance(action, str):
+                import json
+                try:
+                    action_dict = json.loads(action) if action else {}
+                    if 'Allow' in action_dict:
+                        action = 'ALLOW'
+                    elif 'Block' in action_dict:
+                        action = 'BLOCK'
+                    elif 'Count' in action_dict:
+                        action = 'COUNT'
+                    elif 'Captcha' in action_dict:
+                        action = 'CAPTCHA'
+                    elif 'Challenge' in action_dict:
+                        action = 'CHALLENGE'
+                except:
+                    pass
+            ws[f'E{row}'] = action
             row += 1
 
         # Resources section
@@ -151,21 +235,31 @@ class ExcelReportGenerator:
         row += 1
 
         # Data
-        for resource in resources:
-            ws[f'A{row}'] = resource.get('web_acl_name', '')
-            ws[f'B{row}'] = resource.get('resource_type', '')
-            ws[f'C{row}'] = resource.get('resource_arn', '')
+        if resources:
+            for resource in resources:
+                ws[f'A{row}'] = resource.get('web_acl_name', '')
+                ws[f'B{row}'] = resource.get('resource_type', '')
+                ws[f'C{row}'] = resource.get('resource_arn', '')
+                row += 1
+        else:
+            ws[f'A{row}'] = 'No resources associated with Web ACLs'
+            ws[f'A{row}'].font = Font(italic=True, color='808080')
+            ws.merge_cells(f'A{row}:C{row}')
             row += 1
 
         # Auto-adjust column widths
-        for col in ['A', 'B', 'C', 'D', 'E', 'F']:
-            ws.column_dimensions[col].width = 20
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 20
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 12
+        ws.column_dimensions['G'].width = 15
+        ws.column_dimensions['H'].width = 12
 
-        ws.column_dimensions['C'].width = 50
-
-    def create_executive_summary_sheet(self, metrics: Dict[str, Any]) -> None:
+    def create_executive_summary_sheet(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]]) -> None:
         """
-        Create the Executive Summary sheet.
+        Create the Executive Summary sheet with Web ACL information.
         """
         logger.info("Creating Executive Summary sheet...")
 
@@ -176,26 +270,57 @@ class ExcelReportGenerator:
         ws['A1'].font = Font(bold=True, size=16)
         ws.merge_cells('A1:D1')
 
+        row = 3
+
+        # Web ACLs Summary Section
+        ws[f'A{row}'] = 'Web ACLs Overview'
+        ws[f'A{row}'].font = self.title_font
+        row += 1
+
+        # Web ACL details
+        for acl in web_acls:
+            acl_name = acl.get('name', acl.get('Name', ''))
+            acl_scope = acl.get('scope', acl.get('Scope', ''))
+            acl_capacity = acl.get('capacity', acl.get('Capacity', 0))
+            default_action = acl.get('default_action', acl.get('DefaultAction', {}))
+
+            if isinstance(default_action, str):
+                action_str = default_action
+            else:
+                action_str = 'ALLOW' if 'Allow' in default_action else 'BLOCK'
+
+            ws[f'A{row}'] = f"• {acl_name}"
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            ws[f'A{row}'] = "  Scope:"
+            ws[f'B{row}'] = acl_scope
+            row += 1
+            ws[f'A{row}'] = "  Default Action:"
+            ws[f'B{row}'] = action_str
+            row += 1
+            ws[f'A{row}'] = "  Capacity Used:"
+            ws[f'B{row}'] = f"{acl_capacity} WCU"
+            row += 1
+            row += 1  # Extra space between ACLs
+
         # Summary metrics
         summary = metrics.get('summary', {})
         coverage = metrics.get('web_acl_coverage', {})
 
-        row = 3
-
-        # Key metrics
-        ws[f'A{row}'] = 'Key Metrics'
+        row += 1
+        ws[f'A{row}'] = 'Key Security Metrics'
         ws[f'A{row}'].font = self.title_font
         row += 1
 
         key_metrics = [
-            ('Total Requests Analyzed', summary.get('total_requests', 0)),
-            ('Blocked Requests', summary.get('blocked_requests', 0)),
-            ('Block Rate', f"{summary.get('block_rate_percent', 0)}%"),
-            ('Unique Client IPs', summary.get('unique_client_ips', 0)),
-            ('Unique Countries', summary.get('unique_countries', 0)),
+            ('Total Requests Analyzed', f"{summary.get('total_requests', 0):,}"),
+            ('Blocked Requests', f"{summary.get('blocked_requests', 0):,}"),
+            ('Block Rate', f"{summary.get('block_rate_percent', 0):.2f}%"),
+            ('Unique Client IPs', f"{summary.get('unique_client_ips', 0):,}"),
+            ('Unique Countries', f"{summary.get('unique_countries', 0):,}"),
             ('Web ACLs Configured', coverage.get('total_web_acls', 0)),
             ('Protected Resources', coverage.get('total_protected_resources', 0)),
-            ('Logging Coverage', f"{coverage.get('logging_coverage_percent', 0)}%")
+            ('Logging Coverage', f"{coverage.get('logging_coverage_percent', 0):.1f}%")
         ]
 
         for metric_name, metric_value in key_metrics:
@@ -213,10 +338,31 @@ class ExcelReportGenerator:
         time_range = summary.get('time_range')
         if time_range:
             ws[f'A{row}'] = 'Start Date'
-            ws[f'B{row}'] = str(time_range.get('start', ''))
+            ws[f'B{row}'] = str(time_range.get('start', ''))[:19]  # Trim microseconds
             row += 1
             ws[f'A{row}'] = 'End Date'
-            ws[f'B{row}'] = str(time_range.get('end', ''))
+            ws[f'B{row}'] = str(time_range.get('end', ''))[:19]  # Trim microseconds
+            row += 1
+
+        # Security Posture Score
+        security_score = coverage.get('security_posture_score', 0)
+        if security_score:
+            row += 1
+            ws[f'A{row}'] = 'Security Posture Score'
+            ws[f'A{row}'].font = self.title_font
+            row += 1
+            ws[f'A{row}'] = 'Overall Score'
+            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'B{row}'] = f"{security_score}/100"
+            ws[f'B{row}'].font = Font(bold=True, size=14)
+
+            # Color code the score
+            if security_score >= 80:
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='008000')  # Green
+            elif security_score >= 60:
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF8C00')  # Orange
+            else:
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF0000')  # Red
             row += 1
 
         # Action distribution chart
@@ -234,7 +380,7 @@ class ExcelReportGenerator:
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['B'].width = 25
 
     def create_traffic_analysis_sheet(self, metrics: Dict[str, Any]) -> None:
         """
