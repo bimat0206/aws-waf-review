@@ -81,8 +81,9 @@ class WAFConfigProcessor:
             web_acl = response.get('WebACL', {})
             lock_token = response.get('LockToken')
 
-            # Add metadata
+            # Add metadata and scope (AWS API doesn't include scope in response)
             web_acl['_LockToken'] = lock_token
+            web_acl['Scope'] = self.scope  # Add scope for database insertion
 
             logger.info(f"Retrieved Web ACL: {name} ({web_acl_id})")
             return web_acl

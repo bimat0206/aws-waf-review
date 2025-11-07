@@ -2,6 +2,25 @@
 
 All notable changes to the processors module will be documented in this file.
 
+## [1.0.1] - 2025-11-07
+
+### Fixed
+
+#### Configuration Processor (`config_processor.py`)
+- **CRITICAL BUG FIX**: Added missing `Scope` field to Web ACL configurations
+  - AWS WAFv2 API does not include the scope in `get_web_acl` response
+  - The scope is implicit based on which API endpoint is called
+  - Now explicitly adds `web_acl['Scope'] = self.scope` in `get_web_acl()` method
+  - Fixes `ConstraintException: NOT NULL constraint failed: web_acls.scope` error
+  - Affects both REGIONAL and CLOUDFRONT Web ACLs
+  - Line 86 in `config_processor.py`
+
+**Impact**: Without this fix, fetching CLOUDFRONT Web ACLs would fail during database insertion because the scope field was NULL.
+
+**Root Cause**: The AWS GetWebACL API returns the Web ACL configuration but does not include a `Scope` field in the response. The scope is determined by which API endpoint you call (`wafv2.list_web_acls(Scope='REGIONAL')` vs `Scope='CLOUDFRONT'`), but it's not echoed back in the Web ACL object itself.
+
+**Solution**: The `WAFConfigProcessor` class now explicitly adds the scope to each Web ACL configuration before returning it, ensuring the database insertion has all required fields.
+
 ## [1.0.0] - 2025-11-07
 
 ### Added
