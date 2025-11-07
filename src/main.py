@@ -40,6 +40,26 @@ coloredlogs.install(
 )
 
 
+def setup_directories():
+    """
+    Create necessary directories for the application.
+
+    Creates:
+        - data/ : For DuckDB database files
+        - output/ : For Excel reports and exports
+        - logs/ : For application logs (future use)
+    """
+    directories = ['data', 'output', 'logs']
+
+    for directory in directories:
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created directory: {directory}/")
+        else:
+            logger.debug(f"Directory already exists: {directory}/")
+
+
 def print_banner():
     """Print application banner."""
     banner = """
@@ -259,8 +279,8 @@ def main():
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='AWS WAF Security Analysis Tool')
-    parser.add_argument('--db-path', default='waf_analysis.duckdb',
-                       help='Path to DuckDB database file')
+    parser.add_argument('--db-path', default='data/waf_analysis.duckdb',
+                       help='Path to DuckDB database file (default: data/waf_analysis.duckdb)')
     parser.add_argument('--months', type=int, default=3, choices=[3, 6],
                        help='Number of months of logs to analyze (3 or 6)')
     parser.add_argument('--scope', choices=['REGIONAL', 'CLOUDFRONT'], default='REGIONAL',
@@ -274,9 +294,12 @@ def main():
     parser.add_argument('--log-group', help='CloudWatch log group name')
     parser.add_argument('--s3-bucket', help='S3 bucket name')
     parser.add_argument('--s3-prefix', help='S3 key prefix')
-    parser.add_argument('--output', help='Output Excel report filename')
+    parser.add_argument('--output', help='Output Excel report filename (default: output/waf_report_<timestamp>.xlsx)')
 
     args = parser.parse_args()
+
+    # Setup directories
+    setup_directories()
 
     # Verify environment
     if not verify_environment():
@@ -383,7 +406,7 @@ def main():
             output_path = args.output
         else:
             timestamp = format_datetime(datetime.now(), 'filename')
-            output_path = f"waf_report_{timestamp}.xlsx"
+            output_path = f"output/waf_report_{timestamp}.xlsx"
 
         generate_excel_report(db_manager, output_path)
 
