@@ -13,6 +13,7 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 - **Rich Excel Reports**: Generates multi-sheet Excel workbooks with visualizations
 - **LLM-Ready**: Includes prompt templates for AI-powered security analysis
 - **Data-Rich Prompt Exports**: Automatically injects real metrics, rule data, and attack summaries into every exported prompt template for immediate AI consumption
+- **Raw Log Archives**: Stores each CloudWatch fetch as JSONL under `raw-logs/{alias}_{account_id}/` for offline validation and troubleshooting
 - **Modular Architecture**: Clean separation of concerns for easy maintenance and extension
 
 ## Architecture
@@ -39,6 +40,7 @@ aws-waf-analyzer/
 ├── output/{alias}_{account_id}/           # Account-specific Excel reports (auto-created)
 ├── logs/{alias}_{account_id}/             # Account-specific application logs (auto-created)
 ├── exported-prompt/{alias}_{account_id}/  # Filled prompts with WAF data (gitignored, auto-created)
+├── raw-logs/{alias}_{account_id}/         # Archived raw CloudWatch log exports (gitignored)
 ├── requirements.txt                       # Python dependencies
 └── README.md                              # This file
 ```
@@ -893,4 +895,3 @@ Contributions are welcome! Areas for improvement:
 - Real-time monitoring mode
 - Automated remediation suggestions
 - Custom rule development assistance
-

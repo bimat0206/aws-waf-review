@@ -10,6 +10,7 @@ Excel reports with visualizations.
 import sys
 import logging
 import argparse
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -110,7 +111,8 @@ def setup_directories(account_id: str = None, account_alias: str = None):
             'data': f'data/{account_identifier}',
             'output': f'output/{account_identifier}',
             'logs': f'logs/{account_identifier}',
-            'exported_prompts': f'exported-prompt/{account_identifier}'
+            'exported_prompts': f'exported-prompt/{account_identifier}',
+            'raw_logs': f'raw-logs/{account_identifier}'
         }
         logger.info(f"Setting up account-specific directories for AWS Account: {account_identifier}")
     else:
@@ -119,7 +121,8 @@ def setup_directories(account_id: str = None, account_alias: str = None):
             'data': 'data',
             'output': 'output',
             'logs': 'logs',
-            'exported_prompts': 'exported-prompt'
+            'exported_prompts': 'exported-prompt',
+            'raw_logs': 'raw-logs'
         }
 
     created_paths = {}
@@ -133,6 +136,41 @@ def setup_directories(account_id: str = None, account_alias: str = None):
         created_paths[key] = str(dir_path)
 
     return created_paths
+
+
+def export_raw_logs(raw_events: List[dict], raw_logs_dir: Optional[str], source: str,
+                    identifier: str, start_time: Optional[datetime] = None,
+                    end_time: Optional[datetime] = None) -> Optional[Path]:
+    """Persist raw log events for offline inspection."""
+    if not raw_logs_dir or not raw_events:
+        return None
+
+    try:
+        safe_identifier = identifier.strip('/').replace('/', '_')
+        safe_identifier = ''.join(ch if ch.isalnum() or ch in ('-', '_', '.') else '_' for ch in safe_identifier)
+        if not safe_identifier:
+            safe_identifier = 'default'
+        dest_dir = Path(raw_logs_dir) / source / safe_identifier
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        window_parts = []
+        if start_time:
+            window_parts.append(start_time.strftime('%Y%m%d%H%M%S'))
+        if end_time:
+            window_parts.append(end_time.strftime('%Y%m%d%H%M%S'))
+        window = '_to_'.join(window_parts) if window_parts else datetime.utcnow().strftime('%Y%m%d%H%M%S')
+        file_path = dest_dir / f"{source}_logs_{window}.jsonl"
+
+        with open(file_path, 'w', encoding='utf-8') as fh:
+            for event in raw_events:
+                json.dump(event, fh, default=str)
+                fh.write('\n')
+
+        logger.info(f"Exported raw {source} logs to {file_path}")
+        return file_path
+    except Exception as exc:
+        logger.warning(f"Failed to export raw {source} logs: {exc}")
+        return None
 
 
 def print_banner():
@@ -337,7 +375,8 @@ def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL',
 
 
 def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
-                               start_time: datetime, end_time: datetime):
+                               start_time: datetime, end_time: datetime,
+                               raw_logs_dir: Optional[str] = None):
     """
     Fetch logs from CloudWatch and store in database.
 
@@ -362,6 +401,16 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
 
     logger.info(f"Fetched {len(log_events)} log events")
 
+    # Export raw events for troubleshooting
+    export_raw_logs(
+        log_events,
+        raw_logs_dir,
+        source='cloudwatch',
+        identifier=log_group_name,
+        start_time=start_time,
+        end_time=end_time
+    )
+
     # Parse logs
     parsed_logs = parser.parse_batch(log_events, source='cloudwatch')
 
@@ -376,7 +425,8 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
 
 
 def fetch_logs_from_s3(db_manager: DuckDBManager, bucket: str, prefix: str,
-                      start_time: datetime, end_time: datetime):
+                      start_time: datetime, end_time: datetime,
+                      raw_logs_dir: Optional[str] = None):
     """
     Fetch logs from S3 and store in database.
 
@@ -405,6 +455,15 @@ def fetch_logs_from_s3(db_manager: DuckDBManager, bucket: str, prefix: str,
         return
 
     logger.info(f"Fetched {len(log_entries)} log entries")
+
+    export_raw_logs(
+        log_entries,
+        raw_logs_dir,
+        source='s3',
+        identifier=f"{bucket}/{prefix}",
+        start_time=start_time,
+        end_time=end_time
+    )
 
     # Parse logs
     parsed_logs = parser.parse_batch(log_entries, source='s3')
@@ -832,14 +891,14 @@ def main():
                                     logger.info(f"Successfully stored {len(parsed_logs)} log entries")
                         else:
                             # Use the existing function which uses current region
-                            fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+                            fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time, dir_paths.get('raw_logs'))
 
                     elif log_choice == '2':
                         # S3
                         bucket = input("\nEnter S3 bucket name: ")
                         prefix = input("Enter S3 key prefix (or press Enter for root): ").strip() or ""
 
-                        fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time)
+                        fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, dir_paths.get('raw_logs'))
 
                     else:
                         print("❌ Invalid choice")
@@ -962,13 +1021,13 @@ def main():
                     else:
                         log_group_name = args.log_group
 
-                    fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+                    fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time, dir_paths.get('raw_logs'))
 
                 elif args.log_source == 's3':
                     bucket = args.s3_bucket or input("Enter S3 bucket name: ")
                     prefix = args.s3_prefix or input("Enter S3 key prefix: ")
 
-                    fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time)
+                    fetch_logs_from_s3(db_manager, bucket, prefix, start_time, end_time, dir_paths.get('raw_logs'))
 
                 else:
                     logger.error("Log source not specified. Use --log-source cloudwatch or --log-source s3")

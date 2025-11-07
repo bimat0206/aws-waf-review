@@ -295,3 +295,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 [1.0.0]: https://github.com/bimat0206/aws-waf-review/releases/tag/v1.0.0
+## [1.3.1] - 2025-11-07
+
+### Fixed
+
+- **DuckDB log ingestion**: Resolved a `Constraint Error: Duplicate key "log_id: 0"` when importing multiple CloudWatch batches. `insert_log_entries()` now seeds each batch with `MAX(log_id)+1`, preventing primary-key collisions during repeated log fetches.
+## [1.3.2] - 2025-11-07
+
+### Added
+
+- **Raw Log Archives**: Every CloudWatch or S3 fetch now exports the untouched log events as JSONL under `raw-logs/{alias}_{account_id}/<source>/...`, mirroring the `data/` directory structure for each account. This makes it easier to diff, replay, or troubleshoot parsing issues when Excel outputs look empty.
