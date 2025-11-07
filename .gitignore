@@ -42,6 +42,7 @@ data/
 output/
 logs/
 llm_prompts/
+config/prompts/*/  # Account-specific prompt exports
 
 # Database Files
 *.db

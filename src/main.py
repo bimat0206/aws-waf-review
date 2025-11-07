@@ -44,24 +44,53 @@ coloredlogs.install(
 )
 
 
-def setup_directories():
+def setup_directories(account_id: str = None):
     """
     Create necessary directories for the application.
 
-    Creates:
-        - data/ : For DuckDB database files
-        - output/ : For Excel reports and exports
-        - logs/ : For application logs (future use)
-    """
-    directories = ['data', 'output', 'logs']
+    If account_id is provided, creates account-specific subdirectories.
 
-    for directory in directories:
+    Args:
+        account_id (str, optional): AWS Account ID for organizing data by account
+
+    Creates:
+        - data/ or data/{account_id}/ : For DuckDB database files
+        - output/ or output/{account_id}/ : For Excel reports and exports
+        - logs/ or logs/{account_id}/ : For application logs
+        - config/prompts/ or config/prompts/{account_id}/ : For exported prompt data
+
+    Returns:
+        dict: Dictionary containing created directory paths
+    """
+    if account_id:
+        # Create account-specific subdirectories
+        base_dirs = {
+            'data': f'data/{account_id}',
+            'output': f'output/{account_id}',
+            'logs': f'logs/{account_id}',
+            'prompts': f'config/prompts/{account_id}'
+        }
+        logger.info(f"Setting up account-specific directories for AWS Account: {account_id}")
+    else:
+        # Create root directories only
+        base_dirs = {
+            'data': 'data',
+            'output': 'output',
+            'logs': 'logs',
+            'prompts': 'config/prompts'
+        }
+
+    created_paths = {}
+    for key, directory in base_dirs.items():
         dir_path = Path(directory)
         if not dir_path.exists():
             dir_path.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created directory: {directory}/")
         else:
             logger.debug(f"Directory already exists: {directory}/")
+        created_paths[key] = str(dir_path)
+
+    return created_paths
 
 
 def print_banner():
@@ -548,7 +577,7 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='AWS WAF Security Analysis Tool')
     parser.add_argument('--db-path', default='data/waf_analysis.duckdb',
-                       help='Path to DuckDB database file (default: data/waf_analysis.duckdb)')
+                       help='Path to DuckDB database file (default: data/{account_id}/{account_id}_waf_analysis.duckdb)')
     parser.add_argument('--months', type=int, choices=[3, 6],
                        help='Number of months of logs to analyze (3 or 6)')
     parser.add_argument('--scope', choices=['REGIONAL', 'CLOUDFRONT'],
@@ -562,7 +591,7 @@ def main():
     parser.add_argument('--log-group', help='CloudWatch log group name')
     parser.add_argument('--s3-bucket', help='S3 bucket name')
     parser.add_argument('--s3-prefix', help='S3 key prefix')
-    parser.add_argument('--output', help='Output Excel report filename (default: output/waf_report_<timestamp>.xlsx)')
+    parser.add_argument('--output', help='Output Excel report filename (default: output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx)')
     parser.add_argument('--non-interactive', action='store_true',
                        help='Run in non-interactive mode (no prompts)')
 
@@ -572,12 +601,21 @@ def main():
     # Interactive if no scope/log-source specified and not explicitly disabled
     interactive_mode = not args.non_interactive and (args.scope is None or args.log_source is None)
 
-    # Setup directories
-    setup_directories()
-
-    # Verify environment
+    # Verify environment first to get account ID
     if not verify_environment():
         return 1
+
+    # Get AWS account ID for directory organization
+    session_info = get_session_info()
+    account_id = session_info.get('account_id')
+
+    # Setup account-specific directories
+    dir_paths = setup_directories(account_id)
+
+    # Update database path if using default
+    if args.db_path == 'data/waf_analysis.duckdb':
+        args.db_path = f"{dir_paths['data']}/{account_id}_waf_analysis.duckdb"
+        logger.info(f"Using account-specific database: {args.db_path}")
 
     # Initialize database
     logger.info("Initializing database...")
@@ -723,7 +761,7 @@ def main():
 
                     # Ask for output filename
                     timestamp = format_datetime(datetime.now(), 'filename')
-                    default_output = f"output/waf_report_{timestamp}.xlsx"
+                    default_output = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
                     output_path = input(f"\nEnter output filename (press Enter for '{default_output}'): ").strip()
                     output_path = output_path or default_output
 
@@ -812,7 +850,7 @@ def main():
                 output_path = args.output
             else:
                 timestamp = format_datetime(datetime.now(), 'filename')
-                output_path = f"output/waf_report_{timestamp}.xlsx"
+                output_path = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
 
             generate_excel_report(db_manager, output_path)
 

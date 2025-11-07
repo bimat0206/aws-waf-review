@@ -2,6 +2,173 @@
 
 All notable changes to the main application orchestration will be documented in this file.
 
+## [1.3.0] - 2025-11-07
+
+### Added
+
+#### Multi-Account Support with Organized Directory Structure
+- **Account-Specific Directories**: Automatically creates subdirectories organized by AWS Account ID
+- **Database Segregation**: Each AWS account gets its own database file with account ID prefix
+- **Report Organization**: Excel reports saved in account-specific directories with account ID and timestamp
+- **Prompt Export Organization**: Account-specific subdirectories for exported LLM prompt data
+
+#### Directory Structure
+When running the tool, it now creates:
+```
+data/{account_id}/{account_id}_waf_analysis.duckdb
+output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx
+logs/{account_id}/
+config/prompts/{account_id}/
+```
+
+**Benefits**:
+- **Clean Separation**: Data from different AWS accounts never mixed
+- **Easy Management**: Quickly identify which data belongs to which account
+- **Parallel Analysis**: Run tool for multiple accounts without conflicts
+- **Audit Trail**: Account ID in filenames for compliance and tracking
+
+#### Filename Format
+- **Database**: `{account_id}_waf_analysis.duckdb`
+  - Example: `123456789012_waf_analysis.duckdb`
+- **Reports**: `{account_id}_{timestamp}_waf_report.xlsx`
+  - Example: `123456789012_20251107_103045_waf_report.xlsx`
+  - Timestamp format: YYYYMMDD_HHMMSS
+
+### Changed
+
+#### Function Updates
+- **`setup_directories(account_id=None)`**: Now accepts optional account_id parameter
+  - Returns dictionary of created directory paths
+  - Creates account-specific subdirectories when account_id provided
+  - Creates root directories only when account_id is None
+- **Execution Flow**: Environment verification moved before directory setup to get account_id first
+
+#### Default Paths
+- **Database Path**: `data/waf_analysis.duckdb` → `data/{account_id}/{account_id}_waf_analysis.duckdb`
+- **Output Path**: `output/waf_report_{timestamp}.xlsx` → `output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx`
+- **Logs Path**: `logs/` → `logs/{account_id}/`
+- **Prompts Path**: `config/prompts/` → `config/prompts/{account_id}/`
+
+#### CLI Argument Help Text
+- Updated `--db-path` help to show new default format
+- Updated `--output` help to show new default format with account ID
+
+### Improved
+
+#### User Experience
+- **Automatic Organization**: No manual directory management required
+- **Clear Identification**: Account ID prominently displayed in all paths
+- **Timestamp Visibility**: Reports now have format `{account_id}_{timestamp}_waf_report.xlsx`
+- **Easy Sorting**: Files naturally sort by account first, then by timestamp
+
+#### Multi-Account Workflows
+- **Switching Accounts**: Simply switch AWS profile and run - data automatically segregated
+- **Cross-Account Analysis**: Easily compare data from different accounts
+- **Team Collaboration**: Multiple team members can work on different accounts simultaneously
+- **CI/CD Integration**: Can run analysis for multiple accounts in parallel
+
+### Technical Details
+
+#### Account ID Detection
+```python
+# Get AWS account ID from session
+session_info = get_session_info()
+account_id = session_info.get('account_id')
+
+# Setup account-specific directories
+dir_paths = setup_directories(account_id)
+```
+
+#### Directory Path Resolution
+```python
+# dir_paths returned by setup_directories()
+{
+    'data': 'data/123456789012',
+    'output': 'output/123456789012',
+    'logs': 'logs/123456789012',
+    'prompts': 'config/prompts/123456789012'
+}
+```
+
+#### Database Path Selection
+```python
+# If using default path
+if args.db_path == 'data/waf_analysis.duckdb':
+    args.db_path = f"{dir_paths['data']}/{account_id}_waf_analysis.duckdb"
+```
+
+### Usage Examples
+
+#### Single Account Analysis
+```bash
+# Set AWS profile for account A
+export AWS_PROFILE=account-a
+
+python3 waf-analyzer.py
+# Creates:
+# - data/111111111111/111111111111_waf_analysis.duckdb
+# - output/111111111111/111111111111_20251107_103045_waf_report.xlsx
+```
+
+#### Multi-Account Analysis
+```bash
+# Account A
+export AWS_PROFILE=account-a
+python3 waf-analyzer.py
+
+# Account B
+export AWS_PROFILE=account-b
+python3 waf-analyzer.py
+
+# Data organized separately:
+# data/111111111111/
+# data/222222222222/
+# output/111111111111/
+# output/222222222222/
+```
+
+#### Custom Database Path (Override)
+```bash
+# Use custom path instead of default account-specific path
+python3 waf-analyzer.py --db-path /custom/path/my_waf.duckdb
+```
+
+### Backward Compatibility
+
+#### Breaking Changes
+- **Database Path**: Default database path now includes account ID
+  - Old: `data/waf_analysis.duckdb`
+  - New: `data/{account_id}/{account_id}_waf_analysis.duckdb`
+  - **Migration**: Manually move existing databases or use `--db-path` to specify old location
+
+#### Migration Guide
+If you have existing data:
+```bash
+# Option 1: Move existing database to new location
+mkdir -p data/123456789012
+mv data/waf_analysis.duckdb data/123456789012/123456789012_waf_analysis.duckdb
+
+# Option 2: Continue using old path
+python3 waf-analyzer.py --db-path data/waf_analysis.duckdb
+```
+
+### Files Modified
+- `src/main.py:47-93` - Updated `setup_directories()` function
+- `src/main.py:604-623` - Reordered environment verification and directory setup
+- `src/main.py:764,853` - Updated output path generation with account ID and timestamp
+- `src/main.py:579,594` - Updated CLI help text
+- `.gitignore:45` - Added account-specific prompts directory exclusion
+
+### Testing
+
+Validated scenarios:
+- ✅ Single account analysis with automatic directory creation
+- ✅ Multi-account analysis with proper segregation
+- ✅ Database naming with account ID prefix
+- ✅ Report naming with account ID and timestamp
+- ✅ Custom paths override default account-specific paths
+- ✅ Directory creation is idempotent
+
 ## [1.2.1] - 2025-11-07
 
 ### Fixed
