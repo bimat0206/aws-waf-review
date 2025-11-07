@@ -15,8 +15,8 @@ from botocore.exceptions import ClientError
 from tqdm import tqdm
 import tempfile
 
-from ..utils.aws_helpers import get_s3_client, handle_aws_error
-from ..utils.time_helpers import get_s3_prefix_for_date, get_daily_buckets
+from utils.aws_helpers import get_s3_client, handle_aws_error
+from utils.time_helpers import get_s3_prefix_for_date, get_daily_buckets
 
 logger = logging.getLogger(__name__)
 

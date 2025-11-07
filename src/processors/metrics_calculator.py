@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import pandas as pd
 
-from ..storage.duckdb_manager import DuckDBManager
+from storage.duckdb_manager import DuckDBManager
 
 logger = logging.getLogger(__name__)
 
