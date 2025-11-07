@@ -377,7 +377,8 @@ def fetch_waf_configurations(db_manager: DuckDBManager, scope: str = 'REGIONAL',
 
 def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
                                start_time: datetime, end_time: datetime,
-                               raw_logs_dir: Optional[str] = None):
+                               raw_logs_dir: Optional[str] = None,
+                               region: Optional[str] = None):
     """
     Fetch logs from CloudWatch and store in database.
     Also exports raw logs to JSON Lines format.
@@ -387,11 +388,15 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
         log_group_name (str): CloudWatch log group name
         start_time (datetime): Start of time range
         end_time (datetime): End of time range
+        raw_logs_dir (Optional[str]): Directory for raw logs export
+        region (Optional[str]): AWS region for CloudWatch (uses current region if not specified)
     """
     logger.info(f"Fetching logs from CloudWatch: {log_group_name}")
     logger.info(f"Time range: {get_time_window_description(start_time, end_time)}")
+    if region:
+        logger.info(f"Using region: {region}")
 
-    fetcher = CloudWatchFetcher()
+    fetcher = CloudWatchFetcher(region=region)
     parser = WAFLogParser()
 
     # Fetch logs
@@ -882,31 +887,16 @@ def main():
                             else:
                                 log_group_name = input("Enter CloudWatch log group name: ")
 
-                        # Fetch logs using the correct region
-                        if log_group_region:
-                            logger.info(f"Using region {log_group_region} for CloudWatch log group")
-                            fetcher = CloudWatchFetcher(region=log_group_region)
-                            log_events = fetcher.get_log_events(log_group_name, start_time, end_time)
-
-                            if not log_events:
-                                logger.warning("No log events found in CloudWatch")
-                            else:
-                                logger.info(f"Fetched {len(log_events)} log events")
-
-                                # Parse logs
-                                from processors.log_parser import WAFLogParser
-                                parser = WAFLogParser()
-                                parsed_logs = parser.parse_batch(log_events, source='cloudwatch')
-
-                                if not parsed_logs:
-                                    logger.warning("No logs were successfully parsed")
-                                else:
-                                    # Store in database
-                                    db_manager.insert_log_entries(parsed_logs)
-                                    logger.info(f"Successfully stored {len(parsed_logs)} log entries")
-                        else:
-                            # Use the existing function which uses current region
-                            fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time, dir_paths.get('raw_logs'))
+                        # Fetch logs using the fetch_logs_from_cloudwatch function
+                        # This handles fetching, parsing, raw logs export, and database storage
+                        fetch_logs_from_cloudwatch(
+                            db_manager,
+                            log_group_name,
+                            start_time,
+                            end_time,
+                            raw_logs_dir=dir_paths.get('raw_logs'),
+                            region=log_group_region
+                        )
 
                     elif log_choice == '2':
                         # S3
