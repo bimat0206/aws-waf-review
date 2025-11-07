@@ -1,0 +1,47 @@
+{
+  "required_fields": [
+    "timestamp",
+    "action",
+    "clientIp",
+    "country",
+    "uri",
+    "httpMethod",
+    "httpVersion",
+    "httpStatus"
+  ],
+  "security_fields": [
+    "terminatingRuleId",
+    "terminatingRuleType",
+    "ruleGroupList",
+    "labels",
+    "ja3Fingerprint",
+    "ja4Fingerprint"
+  ],
+  "request_fields": [
+    "requestHeaders",
+    "requestUri",
+    "httpRequest"
+  ],
+  "optional_fields": [
+    "webaclId",
+    "terminatingRuleMatchDetails",
+    "httpSourceName",
+    "httpSourceId",
+    "rateBasedRuleList",
+    "nonTerminatingMatchingRules",
+    "requestHeadersInserted",
+    "responseCodeSent"
+  ],
+  "action_values": [
+    "ALLOW",
+    "BLOCK",
+    "COUNT",
+    "CAPTCHA",
+    "CHALLENGE"
+  ],
+  "resource_types": [
+    "ALB",
+    "API_GATEWAY",
+    "CLOUDFRONT"
+  ]
+}
