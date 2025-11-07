@@ -2,6 +2,55 @@
 
 All notable changes to the reporters module will be documented in this file.
 
+## [1.2.1] - 2025-11-07
+
+### Fixed
+
+#### Raw Logs Exporter (`raw_logs_exporter.py`)
+- **CRITICAL BUG FIX**: Support for `@message` field in CloudWatch log events
+  - **Root Cause**: `export_raw_logs_by_web_acl()` method only checked `message` field when extracting Web ACL info
+  - **Impact**: Raw logs were empty or incorrectly grouped because WAF log data wasn't being extracted
+  - **Fix**: Modified line 100 to check both `@message` and `message` fields
+  - **Implementation**: `message = event.get('@message') or event.get('message', '{}')`
+  - **Backward Compatibility**: Works with both CloudWatch API responses and exported logs
+
+**Before (Broken)**:
+```python
+message = event.get('message', '{}')  # Only checked 'message'
+```
+
+**After (Fixed)**:
+```python
+message = event.get('@message') or event.get('message', '{}')
+```
+
+**Impact**:
+- ✅ Raw logs now contain actual WAF log data (not empty)
+- ✅ Logs properly grouped by Web ACL ID
+- ✅ Export to `.jsonl` files works correctly
+- ✅ Supports CloudWatch Insights exports and API responses
+
+### Added
+
+#### Raw Logs Exporter (`raw_logs_exporter.py`)
+- New `RawLogsExporter` class for exporting raw CloudWatch logs
+- `export_raw_logs()` - Export all logs to single JSON Lines file
+- `export_raw_logs_by_web_acl()` - Export logs grouped by Web ACL to separate files
+- Automatic export immediately after fetching logs from CloudWatch
+- JSON Lines format (.jsonl) - one JSON object per line
+- Output location: `output/{account_identifier}/raw_logs/`
+- Filename pattern: `raw_waf_logs_{web_acl_name}_{log_source}_{timestamp}.jsonl`
+- Timestamped filenames prevent overwrites
+- Export happens before parsing to preserve raw data
+- Graceful error handling (logs warning but continues processing)
+
+**Features**:
+- Per-Web ACL organization for targeted analysis
+- Standard JSONL format compatible with log processing tools
+- File size and count reporting
+- Safe filename sanitization for special characters
+- Complete raw data preservation for external analysis
+
 ## [1.2.0] - 2025-11-07
 
 ### Added

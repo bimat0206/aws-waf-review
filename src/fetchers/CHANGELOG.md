@@ -2,6 +2,33 @@
 
 All notable changes to the fetchers module will be documented in this file.
 
+## [1.0.2] - 2025-11-07
+
+### Fixed
+
+#### CloudWatch Fetcher (`cloudwatch_fetcher.py`)
+- **CRITICAL BUG FIX**: Support for `@message` field in log volume estimation
+  - **Root Cause**: `estimate_log_volume()` method only checked `message` field when calculating average event size
+  - **Impact**: Volume estimates were inaccurate or returned 0 for CloudWatch Insights exports using `@message`
+  - **Fix**: Modified line 280 to check both `@message` and `message` fields
+  - **Implementation**: `total_bytes = sum(len(event.get('@message') or event.get('message', '')) for event in sample_events)`
+  - **Backward Compatibility**: Works with both field naming conventions
+
+**Before (Broken)**:
+```python
+total_bytes = sum(len(event.get('message', '')) for event in sample_events)
+```
+
+**After (Fixed)**:
+```python
+total_bytes = sum(len(event.get('@message') or event.get('message', '')) for event in sample_events)
+```
+
+**Impact**:
+- ✅ Accurate log volume estimates for all CloudWatch log sources
+- ✅ Better user feedback on expected data size before fetch
+- ✅ Supports both API responses and exported logs
+
 ## [1.0.1] - 2025-11-07
 
 ### Fixed
