@@ -42,12 +42,68 @@ class ExcelReportGenerator:
 
         self.viz = VisualizationHelpers()
 
-        # Styling
-        self.header_font = Font(bold=True, size=12, color='FFFFFF')
-        self.header_fill = PatternFill(start_color='2C3E50', end_color='2C3E50', fill_type='solid')
-        self.title_font = Font(bold=True, size=14)
+        # Professional Styling Theme
+        self.header_font = Font(bold=True, size=11, color='FFFFFF', name='Calibri')
+        self.header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')  # Professional blue
+        self.title_font = Font(bold=True, size=14, color='1F4E78', name='Calibri')
+        self.subtitle_font = Font(bold=True, size=12, color='2C3E50', name='Calibri')
+        self.data_font = Font(size=10, name='Calibri')
+        self.highlight_fill = PatternFill(start_color='E7E6E6', end_color='E7E6E6', fill_type='solid')  # Light gray
+        self.success_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Light green
+        self.warning_fill = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid')  # Light yellow
+        self.danger_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')  # Light red
+
+        # Border styles
+        self.thin_border = Border(
+            left=Side(style='thin', color='D0D0D0'),
+            right=Side(style='thin', color='D0D0D0'),
+            top=Side(style='thin', color='D0D0D0'),
+            bottom=Side(style='thin', color='D0D0D0')
+        )
+        self.thick_border = Border(
+            left=Side(style='medium', color='1F4E78'),
+            right=Side(style='medium', color='1F4E78'),
+            top=Side(style='medium', color='1F4E78'),
+            bottom=Side(style='medium', color='1F4E78')
+        )
 
         logger.info(f"Excel report generator initialized: {output_path}")
+
+    def _apply_cell_style(self, cell, font=None, fill=None, border=None, alignment=None):
+        """Apply consistent styling to a cell."""
+        if font:
+            cell.font = font
+        if fill:
+            cell.fill = fill
+        if border:
+            cell.border = border
+        if alignment:
+            cell.alignment = alignment
+
+    def _format_header_row(self, ws, row, columns, start_col=1):
+        """Format a header row with professional styling."""
+        for col_idx, header in enumerate(columns, start=start_col):
+            cell = ws.cell(row=row, column=col_idx)
+            cell.value = header
+            self._apply_cell_style(
+                cell,
+                font=self.header_font,
+                fill=self.header_fill,
+                border=self.thin_border,
+                alignment=Alignment(horizontal='center', vertical='center', wrap_text=True)
+            )
+        ws.row_dimensions[row].height = 25
+
+    def _format_data_cell(self, cell, value, highlight=False):
+        """Format a data cell with professional styling."""
+        cell.value = value
+        self._apply_cell_style(
+            cell,
+            font=self.data_font,
+            fill=self.highlight_fill if highlight else None,
+            border=self.thin_border,
+            alignment=Alignment(vertical='center', wrap_text=False)
+        )
 
     def generate_report(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]],
                        resources: List[Dict[str, Any]], logging_configs: List[Dict[str, Any]],
@@ -91,26 +147,28 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("Inventory")
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'AWS WAF Inventory'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
         ws.merge_cells('A1:H1')
+        ws.row_dimensions[1].height = 30
+
+        # Add a subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:H2')
 
         # Web ACLs section
-        row = 3
-        ws[f'A{row}'] = 'Web ACLs'
-        ws[f'A{row}'].font = self.title_font
+        row = 4
+        ws[f'A{row}'] = 'Web ACLs Configuration'
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:H{row}')
         row += 1
 
-        # Headers
+        # Headers with professional formatting
         headers = ['Name', 'ID', 'Scope', 'Default Action', 'Capacity', 'Rules Count', 'Resources Count', 'Logging']
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=row, column=col)
-            cell.value = header
-            cell.font = self.header_font
-            cell.fill = self.header_fill
-            cell.alignment = Alignment(horizontal='center')
-
+        self._format_header_row(ws, row, headers)
         row += 1
 
         # Data
@@ -121,57 +179,57 @@ class ExcelReportGenerator:
             if web_acl_id:
                 resources_count[web_acl_id] = resources_count.get(web_acl_id, 0) + 1
 
-        for acl in web_acls:
+        for idx, acl in enumerate(web_acls):
             acl_id = acl.get('web_acl_id', acl.get('Id', ''))
             acl_name = acl.get('name', acl.get('Name', ''))
 
-            ws[f'A{row}'] = acl_name
-            ws[f'B{row}'] = acl_id
-            ws[f'C{row}'] = acl.get('scope', acl.get('Scope', ''))
+            # Apply alternating row colors
+            highlight = idx % 2 == 0
 
             default_action = acl.get('default_action', acl.get('DefaultAction', {}))
             if isinstance(default_action, str):
                 action_str = default_action
             else:
                 action_str = 'ALLOW' if 'Allow' in default_action else 'BLOCK'
-            ws[f'D{row}'] = action_str
 
-            ws[f'E{row}'] = acl.get('capacity', acl.get('Capacity', 0))
-
-            # Rules count
             rules_count = len(rules_by_web_acl.get(acl_id, []))
-            ws[f'F{row}'] = rules_count
-
-            # Resources count
-            ws[f'G{row}'] = resources_count.get(acl_id, 0)
-
-            # Logging status
             logging_enabled = 'Yes' if acl_id in logging_config_ids else 'No'
-            ws[f'H{row}'] = logging_enabled
 
-            # Color code logging status
+            # Apply professional styling to all cells in the row
+            row_data = [
+                acl_name,
+                acl_id,
+                acl.get('scope', acl.get('Scope', '')),
+                action_str,
+                acl.get('capacity', acl.get('Capacity', 0)),
+                rules_count,
+                resources_count.get(acl_id, 0),
+                logging_enabled
+            ]
+
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws.cell(row=row, column=col_idx)
+                self._format_data_cell(cell, value, highlight)
+
+            # Special color coding for logging status
+            logging_cell = ws.cell(row=row, column=8)
             if logging_enabled == 'No':
-                ws[f'H{row}'].fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+                logging_cell.fill = self.danger_fill
             else:
-                ws[f'H{row}'].fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+                logging_cell.fill = self.success_fill
 
             row += 1
 
         # Rules section (detailed view)
         row += 2
         ws[f'A{row}'] = 'Rules and Rule Groups'
-        ws[f'A{row}'].font = self.title_font
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:E{row}')
         row += 1
 
         # Headers
         headers = ['Web ACL', 'Rule Name', 'Priority', 'Type', 'Action']
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=row, column=col)
-            cell.value = header
-            cell.font = self.header_font
-            cell.fill = self.header_fill
-            cell.alignment = Alignment(horizontal='center')
-
+        self._format_header_row(ws, row, headers)
         row += 1
 
         # Get Web ACL names mapping
@@ -189,17 +247,13 @@ class ExcelReportGenerator:
         # Sort by Web ACL name and priority
         all_rules.sort(key=lambda x: (x['web_acl_name'], x['rule'].get('priority', 0)))
 
-        for item in all_rules:
+        import json
+        for idx, item in enumerate(all_rules):
             rule = item['rule']
-            ws[f'A{row}'] = item['web_acl_name']
-            ws[f'B{row}'] = rule.get('name', '')
-            ws[f'C{row}'] = rule.get('priority', '')
-            ws[f'D{row}'] = rule.get('rule_type', '')
 
             # Parse action from JSON string if needed
             action = rule.get('action', '')
             if isinstance(action, str):
-                import json
                 try:
                     action_dict = json.loads(action) if action else {}
                     if 'Allow' in action_dict:
@@ -214,36 +268,56 @@ class ExcelReportGenerator:
                         action = 'CHALLENGE'
                 except:
                     pass
-            ws[f'E{row}'] = action
+
+            # Apply alternating row colors
+            highlight = idx % 2 == 0
+
+            row_data = [
+                item['web_acl_name'],
+                rule.get('name', ''),
+                rule.get('priority', ''),
+                rule.get('rule_type', ''),
+                action
+            ]
+
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws.cell(row=row, column=col_idx)
+                self._format_data_cell(cell, value, highlight)
+
             row += 1
 
         # Resources section
         row += 2
         ws[f'A{row}'] = 'Protected Resources'
-        ws[f'A{row}'].font = self.title_font
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:C{row}')
         row += 1
 
         # Headers
         headers = ['Web ACL Name', 'Resource Type', 'Resource ARN']
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=row, column=col)
-            cell.value = header
-            cell.font = self.header_font
-            cell.fill = self.header_fill
-            cell.alignment = Alignment(horizontal='center')
-
+        self._format_header_row(ws, row, headers)
         row += 1
 
         # Data
         if resources:
-            for resource in resources:
-                ws[f'A{row}'] = resource.get('web_acl_name', '')
-                ws[f'B{row}'] = resource.get('resource_type', '')
-                ws[f'C{row}'] = resource.get('resource_arn', '')
+            for idx, resource in enumerate(resources):
+                highlight = idx % 2 == 0
+
+                row_data = [
+                    resource.get('web_acl_name', ''),
+                    resource.get('resource_type', ''),
+                    resource.get('resource_arn', '')
+                ]
+
+                for col_idx, value in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row, column=col_idx)
+                    self._format_data_cell(cell, value, highlight)
+
                 row += 1
         else:
             ws[f'A{row}'] = 'No resources associated with Web ACLs'
-            ws[f'A{row}'].font = Font(italic=True, color='808080')
+            ws[f'A{row}'].font = Font(italic=True, color='808080', name='Calibri')
+            ws[f'A{row}'].alignment = Alignment(vertical='center')
             ws.merge_cells(f'A{row}:C{row}')
             row += 1
 
@@ -265,16 +339,24 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("Executive Summary", 0)
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'AWS WAF Security Analysis - Executive Summary'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
         ws.merge_cells('A1:D1')
+        ws.row_dimensions[1].height = 30
 
-        row = 3
+        # Subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:D2')
+
+        row = 4
 
         # Web ACLs Summary Section
         ws[f'A{row}'] = 'Web ACLs Overview'
-        ws[f'A{row}'].font = self.title_font
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:D{row}')
         row += 1
 
         # Web ACL details
@@ -290,17 +372,26 @@ class ExcelReportGenerator:
                 action_str = 'ALLOW' if 'Allow' in default_action else 'BLOCK'
 
             ws[f'A{row}'] = f"• {acl_name}"
-            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].font = Font(bold=True, size=11, name='Calibri')
+            ws.merge_cells(f'A{row}:D{row}')
             row += 1
-            ws[f'A{row}'] = "  Scope:"
-            ws[f'B{row}'] = acl_scope
-            row += 1
-            ws[f'A{row}'] = "  Default Action:"
-            ws[f'B{row}'] = action_str
-            row += 1
-            ws[f'A{row}'] = "  Capacity Used:"
-            ws[f'B{row}'] = f"{acl_capacity} WCU"
-            row += 1
+
+            # Format ACL details with borders and consistent styling
+            acl_details = [
+                ("  Scope:", acl_scope),
+                ("  Default Action:", action_str),
+                ("  Capacity Used:", f"{acl_capacity} WCU")
+            ]
+
+            for label, value in acl_details:
+                ws[f'A{row}'] = label
+                ws[f'A{row}'].font = self.data_font
+                ws[f'A{row}'].border = self.thin_border
+                ws[f'B{row}'] = value
+                ws[f'B{row}'].font = Font(bold=True, size=10, name='Calibri')
+                ws[f'B{row}'].border = self.thin_border
+                row += 1
+
             row += 1  # Extra space between ACLs
 
         # Summary metrics
@@ -309,7 +400,8 @@ class ExcelReportGenerator:
 
         row += 1
         ws[f'A{row}'] = 'Key Security Metrics'
-        ws[f'A{row}'].font = self.title_font
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:D{row}')
         row += 1
 
         key_metrics = [
@@ -323,46 +415,72 @@ class ExcelReportGenerator:
             ('Logging Coverage', f"{coverage.get('logging_coverage_percent', 0):.1f}%")
         ]
 
-        for metric_name, metric_value in key_metrics:
+        for idx, (metric_name, metric_value) in enumerate(key_metrics):
+            highlight = idx % 2 == 0
+
             ws[f'A{row}'] = metric_name
-            ws[f'A{row}'].font = Font(bold=True)
+            ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
+            ws[f'A{row}'].border = self.thin_border
+            ws[f'A{row}'].fill = self.highlight_fill if highlight else None
+
             ws[f'B{row}'] = metric_value
+            ws[f'B{row}'].font = Font(bold=True, size=11, color='1F4E78', name='Calibri')
+            ws[f'B{row}'].border = self.thin_border
+            ws[f'B{row}'].fill = self.highlight_fill if highlight else None
+            ws[f'B{row}'].alignment = Alignment(horizontal='right', vertical='center')
+
             row += 1
 
         # Time range
         row += 1
         ws[f'A{row}'] = 'Analysis Period'
-        ws[f'A{row}'].font = self.title_font
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:D{row}')
         row += 1
 
         time_range = summary.get('time_range')
         if time_range:
-            ws[f'A{row}'] = 'Start Date'
-            ws[f'B{row}'] = str(time_range.get('start', ''))[:19]  # Trim microseconds
-            row += 1
-            ws[f'A{row}'] = 'End Date'
-            ws[f'B{row}'] = str(time_range.get('end', ''))[:19]  # Trim microseconds
-            row += 1
+            time_data = [
+                ('Start Date', str(time_range.get('start', ''))[:19]),
+                ('End Date', str(time_range.get('end', ''))[:19])
+            ]
+
+            for label, value in time_data:
+                ws[f'A{row}'] = label
+                ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
+                ws[f'A{row}'].border = self.thin_border
+                ws[f'B{row}'] = value
+                ws[f'B{row}'].font = self.data_font
+                ws[f'B{row}'].border = self.thin_border
+                row += 1
 
         # Security Posture Score
         security_score = coverage.get('security_posture_score', 0)
         if security_score:
             row += 1
             ws[f'A{row}'] = 'Security Posture Score'
-            ws[f'A{row}'].font = self.title_font
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:D{row}')
             row += 1
-            ws[f'A{row}'] = 'Overall Score'
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'B{row}'] = f"{security_score}/100"
-            ws[f'B{row}'].font = Font(bold=True, size=14)
 
-            # Color code the score
+            ws[f'A{row}'] = 'Overall Score'
+            ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
+            ws[f'A{row}'].border = self.thin_border
+
+            ws[f'B{row}'] = f"{security_score}/100"
+            ws[f'B{row}'].border = self.thin_border
+            ws[f'B{row}'].alignment = Alignment(horizontal='right', vertical='center')
+
+            # Color code the score with appropriate fill
             if security_score >= 80:
-                ws[f'B{row}'].font = Font(bold=True, size=14, color='008000')  # Green
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='008000', name='Calibri')  # Green
+                ws[f'B{row}'].fill = self.success_fill
             elif security_score >= 60:
-                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF8C00')  # Orange
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF8C00', name='Calibri')  # Orange
+                ws[f'B{row}'].fill = self.warning_fill
             else:
-                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF0000')  # Red
+                ws[f'B{row}'].font = Font(bold=True, size=14, color='FF0000', name='Calibri')  # Red
+                ws[f'B{row}'].fill = self.danger_fill
             row += 1
 
         # Action distribution chart
@@ -390,11 +508,19 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("Traffic Analysis")
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'Traffic Analysis'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        ws.merge_cells('A1:E1')
+        ws.row_dimensions[1].height = 30
 
-        row = 3
+        # Subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:E2')
+
+        row = 4
 
         # Daily trends chart
         daily_data = metrics.get('daily_trends')
@@ -413,32 +539,39 @@ class ExcelReportGenerator:
         geo_data = metrics.get('geographic_distribution', [])
         if geo_data:
             ws[f'A{row}'] = 'Geographic Distribution'
-            ws[f'A{row}'].font = self.title_font
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:E{row}')
             row += 1
 
             # Create table
             headers = ['Country', 'Total Requests', 'Blocked', 'Allowed', 'Threat Score']
-            for col, header in enumerate(headers, start=1):
-                cell = ws.cell(row=row, column=col)
-                cell.value = header
-                cell.font = self.header_font
-                cell.fill = self.header_fill
-
+            self._format_header_row(ws, row, headers)
             row += 1
 
-            for country_data in geo_data[:20]:  # Top 20
-                ws[f'A{row}'] = country_data.get('country', '')
-                ws[f'B{row}'] = country_data.get('total_requests', 0)
-                ws[f'C{row}'] = country_data.get('blocked_requests', 0)
-                ws[f'D{row}'] = country_data.get('allowed_requests', 0)
-                ws[f'E{row}'] = f"{country_data.get('threat_score', 0)}%"
+            for idx, country_data in enumerate(geo_data[:20]):  # Top 20
+                highlight = idx % 2 == 0
+                threat_score = country_data.get('threat_score', 0)
+
+                row_data = [
+                    country_data.get('country', ''),
+                    country_data.get('total_requests', 0),
+                    country_data.get('blocked_requests', 0),
+                    country_data.get('allowed_requests', 0),
+                    f"{threat_score:.1f}%"
+                ]
+
+                for col_idx, value in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row, column=col_idx)
+                    self._format_data_cell(cell, value, highlight)
 
                 # Color code threat score
-                threat_score = country_data.get('threat_score', 0)
+                threat_cell = ws.cell(row=row, column=5)
                 if threat_score > 50:
-                    ws[f'E{row}'].fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+                    threat_cell.fill = self.danger_fill
+                    threat_cell.font = Font(bold=True, size=10, color='C00000', name='Calibri')
                 elif threat_score > 25:
-                    ws[f'E{row}'].fill = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid')
+                    threat_cell.fill = self.warning_fill
+                    threat_cell.font = Font(bold=True, size=10, color='FF8C00', name='Calibri')
 
                 row += 1
 
@@ -465,42 +598,55 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("Rule Effectiveness")
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'Rule Effectiveness Analysis'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        ws.merge_cells('A1:G1')
+        ws.row_dimensions[1].height = 30
 
-        row = 3
+        # Subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:G2')
+
+        row = 4
 
         # Rule effectiveness table
         rule_data = metrics.get('rule_effectiveness', [])
         if rule_data:
             # Headers
             headers = ['Rule ID', 'Rule Type', 'Hit Count', 'Blocks', 'Allows', 'Hit Rate %', 'Block Rate %']
-            for col, header in enumerate(headers, start=1):
-                cell = ws.cell(row=row, column=col)
-                cell.value = header
-                cell.font = self.header_font
-                cell.fill = self.header_fill
-                cell.alignment = Alignment(horizontal='center')
-
+            self._format_header_row(ws, row, headers)
             row += 1
 
             # Data
-            for rule in rule_data:
-                ws[f'A{row}'] = rule.get('rule_id', '')[:50]
-                ws[f'B{row}'] = rule.get('rule_type', '')
-                ws[f'C{row}'] = rule.get('hit_count', 0)
-                ws[f'D{row}'] = rule.get('blocks', 0)
-                ws[f'E{row}'] = rule.get('allows', 0)
-                ws[f'F{row}'] = rule.get('hit_rate_percent', 0)
-                ws[f'G{row}'] = rule.get('block_rate_percent', 0)
+            for idx, rule in enumerate(rule_data):
+                highlight = idx % 2 == 0
+                hit_rate = rule.get('hit_rate_percent', 0)
+
+                row_data = [
+                    rule.get('rule_id', '')[:50],
+                    rule.get('rule_type', ''),
+                    rule.get('hit_count', 0),
+                    rule.get('blocks', 0),
+                    rule.get('allows', 0),
+                    f"{hit_rate:.1f}",
+                    f"{rule.get('block_rate_percent', 0):.1f}"
+                ]
+
+                for col_idx, value in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row, column=col_idx)
+                    self._format_data_cell(cell, value, highlight)
 
                 # Color code hit rate
-                hit_rate = rule.get('hit_rate_percent', 0)
+                hit_rate_cell = ws.cell(row=row, column=6)
                 if hit_rate == 0:
-                    ws[f'F{row}'].fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+                    hit_rate_cell.fill = self.danger_fill
+                    hit_rate_cell.font = Font(bold=True, size=10, color='C00000', name='Calibri')
                 elif hit_rate > 10:
-                    ws[f'F{row}'].fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+                    hit_rate_cell.fill = self.success_fill
+                    hit_rate_cell.font = Font(bold=True, size=10, color='008000', name='Calibri')
 
                 row += 1
 
@@ -520,7 +666,8 @@ class ExcelReportGenerator:
         if attack_data:
             row += 30
             ws[f'A{row}'] = 'Attack Type Distribution'
-            ws[f'A{row}'].font = self.title_font
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:G{row}')
             row += 2
 
             try:
@@ -545,37 +692,50 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("Client Analysis")
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'Client and Bot Analysis'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        ws.merge_cells('A1:F1')
+        ws.row_dimensions[1].height = 30
 
-        row = 3
+        # Subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:F2')
+
+        row = 4
 
         # Top blocked IPs
         top_ips = metrics.get('top_blocked_ips', [])
         if top_ips:
             ws[f'A{row}'] = 'Top Blocked IP Addresses'
-            ws[f'A{row}'].font = self.title_font
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:F{row}')
             row += 1
 
             # Headers
             headers = ['IP Address', 'Country', 'Block Count', 'Unique Rules Hit', 'First Seen', 'Last Seen']
-            for col, header in enumerate(headers, start=1):
-                cell = ws.cell(row=row, column=col)
-                cell.value = header
-                cell.font = self.header_font
-                cell.fill = self.header_fill
-
+            self._format_header_row(ws, row, headers)
             row += 1
 
             # Data
-            for ip_data in top_ips[:30]:  # Top 30
-                ws[f'A{row}'] = ip_data.get('ip', '')
-                ws[f'B{row}'] = ip_data.get('country', '')
-                ws[f'C{row}'] = ip_data.get('block_count', 0)
-                ws[f'D{row}'] = ip_data.get('unique_rules_hit', 0)
-                ws[f'E{row}'] = str(ip_data.get('first_seen', ''))
-                ws[f'F{row}'] = str(ip_data.get('last_seen', ''))
+            for idx, ip_data in enumerate(top_ips[:30]):  # Top 30
+                highlight = idx % 2 == 0
+
+                row_data = [
+                    ip_data.get('ip', ''),
+                    ip_data.get('country', ''),
+                    ip_data.get('block_count', 0),
+                    ip_data.get('unique_rules_hit', 0),
+                    str(ip_data.get('first_seen', ''))[:19],
+                    str(ip_data.get('last_seen', ''))[:19]
+                ]
+
+                for col_idx, value in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row, column=col_idx)
+                    self._format_data_cell(cell, value, highlight)
+
                 row += 1
 
         # Bot analysis
@@ -583,27 +743,55 @@ class ExcelReportGenerator:
         bot_analysis = metrics.get('bot_analysis', {})
         if bot_analysis:
             ws[f'A{row}'] = 'Bot Traffic Analysis'
-            ws[f'A{row}'].font = self.title_font
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:F{row}')
             row += 1
 
-            ws[f'A{row}'] = 'Requests with JA3 Fingerprint'
-            ws[f'B{row}'] = bot_analysis.get('requests_with_ja3', 0)
-            row += 1
+            # Bot metrics with professional styling
+            bot_metrics = [
+                ('Requests with JA3 Fingerprint', bot_analysis.get('requests_with_ja3', 0)),
+                ('Requests with JA4 Fingerprint', bot_analysis.get('requests_with_ja4', 0))
+            ]
 
-            ws[f'A{row}'] = 'Requests with JA4 Fingerprint'
-            ws[f'B{row}'] = bot_analysis.get('requests_with_ja4', 0)
-            row += 2
+            for idx, (label, value) in enumerate(bot_metrics):
+                highlight = idx % 2 == 0
+                ws[f'A{row}'] = label
+                ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
+                ws[f'A{row}'].border = self.thin_border
+                ws[f'A{row}'].fill = self.highlight_fill if highlight else None
+
+                ws[f'B{row}'] = value
+                ws[f'B{row}'].font = self.data_font
+                ws[f'B{row}'].border = self.thin_border
+                ws[f'B{row}'].fill = self.highlight_fill if highlight else None
+                row += 1
+
+            row += 1
 
             # Top user agents
             top_agents = bot_analysis.get('top_user_agents', [])
             if top_agents:
                 ws[f'A{row}'] = 'Top User Agents'
-                ws[f'A{row}'].font = Font(bold=True)
+                ws[f'A{row}'].font = Font(bold=True, size=11, name='Calibri')
+                ws.merge_cells(f'A{row}:B{row}')
                 row += 1
 
-                for agent_data in top_agents[:15]:
-                    ws[f'A{row}'] = agent_data.get('user_agent', '')[:100]
-                    ws[f'B{row}'] = agent_data.get('count', 0)
+                # Headers
+                headers = ['User Agent', 'Request Count']
+                self._format_header_row(ws, row, headers, start_col=1)
+                row += 1
+
+                for idx, agent_data in enumerate(top_agents[:15]):
+                    highlight = idx % 2 == 0
+                    row_data = [
+                        agent_data.get('user_agent', '')[:100],
+                        agent_data.get('count', 0)
+                    ]
+
+                    for col_idx, value in enumerate(row_data, start=1):
+                        cell = ws.cell(row=row, column=col_idx)
+                        self._format_data_cell(cell, value, highlight)
+
                     row += 1
 
         # Hourly patterns
@@ -633,16 +821,24 @@ class ExcelReportGenerator:
 
         ws = self.workbook.create_sheet("LLM Recommendations")
 
-        # Title
+        # Title with professional styling
         ws['A1'] = 'AI-Generated Security Recommendations'
-        ws['A1'].font = Font(bold=True, size=16)
+        ws['A1'].font = Font(bold=True, size=18, color='1F4E78', name='Calibri')
+        ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
         ws.merge_cells('A1:D1')
+        ws.row_dimensions[1].height = 30
 
-        row = 3
+        # Subtitle
+        ws['A2'] = f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+        ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
+        ws.merge_cells('A2:D2')
 
-        # Instructions
+        row = 4
+
+        # Instructions box with highlighted background
         ws[f'A{row}'] = 'Instructions:'
-        ws[f'A{row}'].font = Font(bold=True, italic=True)
+        ws[f'A{row}'].font = self.subtitle_font
+        ws.merge_cells(f'A{row}:D{row}')
         row += 1
 
         instructions = [
@@ -654,41 +850,48 @@ class ExcelReportGenerator:
 
         for instruction in instructions:
             ws[f'A{row}'] = instruction
-            ws[f'A{row}'].font = Font(italic=True)
-            row += 1
-
-        # Sections
-        sections = [
-            ('Critical Findings', 'Immediate action required'),
-            ('High Priority Recommendations', 'Implement within 30 days'),
-            ('Medium Priority Optimizations', 'Implement within 90 days'),
-            ('Low Priority Suggestions', 'Nice to have improvements')
-        ]
-
-        for section_title, section_desc in sections:
-            row += 2
-            ws[f'A{row}'] = section_title
-            ws[f'A{row}'].font = self.title_font
-            ws[f'A{row}'].fill = PatternFill(start_color='E8F4F8', end_color='E8F4F8', fill_type='solid')
+            ws[f'A{row}'].font = Font(italic=True, size=10, name='Calibri')
+            ws[f'A{row}'].fill = PatternFill(start_color='FFF4E6', end_color='FFF4E6', fill_type='solid')
             ws.merge_cells(f'A{row}:D{row}')
             row += 1
 
+        # Sections with professional styling
+        sections = [
+            ('Critical Findings', 'Immediate action required', 'FF6B6B'),
+            ('High Priority Recommendations', 'Implement within 30 days', 'FFA500'),
+            ('Medium Priority Optimizations', 'Implement within 90 days', 'FFD93D'),
+            ('Low Priority Suggestions', 'Nice to have improvements', '6BCF7F')
+        ]
+
+        for section_title, section_desc, color in sections:
+            row += 2
+            ws[f'A{row}'] = section_title
+            ws[f'A{row}'].font = Font(bold=True, size=12, color='FFFFFF', name='Calibri')
+            ws[f'A{row}'].fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
+            ws[f'A{row}'].alignment = Alignment(horizontal='left', vertical='center')
+            ws[f'A{row}'].border = self.thin_border
+            ws.merge_cells(f'A{row}:D{row}')
+            ws.row_dimensions[row].height = 25
+            row += 1
+
             ws[f'A{row}'] = section_desc
-            ws[f'A{row}'].font = Font(italic=True, size=10)
+            ws[f'A{row}'].font = Font(italic=True, size=10, name='Calibri')
+            ws[f'A{row}'].fill = self.highlight_fill
+            ws.merge_cells(f'A{row}:D{row}')
             row += 1
 
             # Template rows
             headers = ['Priority', 'Finding/Recommendation', 'Impact', 'Action Items']
-            for col, header in enumerate(headers, start=1):
-                cell = ws.cell(row=row, column=col)
-                cell.value = header
-                cell.font = self.header_font
-                cell.fill = self.header_fill
-
+            self._format_header_row(ws, row, headers)
             row += 1
 
-            # Add 3 empty rows for each section
-            for _ in range(3):
+            # Add 3 empty rows with borders for each section
+            for i in range(3):
+                for col_idx in range(1, 5):
+                    cell = ws.cell(row=row, column=col_idx)
+                    cell.border = self.thin_border
+                    if i % 2 == 0:
+                        cell.fill = self.highlight_fill
                 row += 1
 
         # Auto-adjust columns
