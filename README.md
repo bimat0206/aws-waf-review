@@ -673,42 +673,95 @@ aws-waf-review/
 
 ## Excel Report Structure
 
-The generated Excel report contains the following sheets:
+The generated Excel report contains **8 professional sheets** with comprehensive analysis:
 
 ### 1. Executive Summary
-- High-level metrics and KPIs
-- Security posture score
-- Action distribution charts
+- **Web ACLs Overview** section with detailed configuration for each Web ACL
+- High-level metrics and KPIs with professional formatting
+- **Security Posture Score** (color-coded: Green ≥80, Orange ≥60, Red <60)
+- Action distribution pie charts
 - Time range and coverage information
+- Key security metrics with alternating row highlighting
+- Professional styling with 18pt titles and generation timestamps
 
 ### 2. Inventory
-- List of all Web ACLs with configurations
-- Protected resources (ALB, API Gateway, CloudFront)
-- Logging status and destinations
-- Color-coded warnings for missing logging
+- **Web ACLs Configuration** table with rules count and resources count
+- **Rule Implementation Summary** ⭐ NEW
+  - Total rules configured
+  - Rules breakdown by type (with percentages)
+  - Rules breakdown by action (BLOCK, ALLOW, COUNT, etc. with percentages)
+  - Color-coded actions for easy identification
+- **Rules and Rule Groups** detailed table sorted by Web ACL and priority
+- **Protected Resources** (ALB, API Gateway, CloudFront, AppSync, Cognito, etc.)
+- Logging status with color-coding (red for disabled, green for enabled)
 
 ### 3. Traffic Analysis
-- Daily traffic trends (line charts)
+- Daily traffic trends (line charts with blocked/allowed breakdown)
 - Geographic distribution of traffic and threats
-- Top countries by blocked requests
-- Threat scores by geography
+- Top 20 countries by request volume
+- Threat scores by geography with color-coding
+- Geographic threat visualization chart
 
 ### 4. Rule Effectiveness
-- Rule performance metrics (hit count, block rate)
-- Rules with 0% hit rate (potentially redundant)
-- Attack type distribution
-- Top blocking rules with visualizations
+- Rule performance metrics (hit count, block rate, effectiveness percentage)
+- Rules with 0% hit rate highlighted in red (potentially redundant)
+- Attack type distribution with horizontal bar chart
+- Top 15 blocking rules with visualizations
+- Color-coded effectiveness indicators
 
-### 5. Client Analysis
-- Top blocked IP addresses
+### 5. Geographic Distribution of Blocked Traffic ⭐ NEW
+- **Purpose**: Identifies geographic origins of blocked requests to detect malicious traffic sources
+- **Blocked Traffic Summary** with key statistics:
+  - Total blocked requests
+  - Number of countries with blocked traffic
+  - Top blocking country identification
+- **Top 30 Countries** by blocked requests with:
+  - Block rate percentage
+  - **Threat Level** assessment (CRITICAL, HIGH, MEDIUM, LOW)
+  - **Risk Assessment** with actionable insights
+  - Color-coded threat levels for immediate visual identification
+- Geographic visualization chart
+
+### 6. Rule Action Distribution ⭐ NEW
+- **Purpose**: Evaluates rule effectiveness and identifies optimization opportunities
+- **Overall Action Distribution**:
+  - Breakdown by action type (BLOCK, ALLOW, COUNT, CAPTCHA, CHALLENGE)
+  - Security impact assessment for each action
+  - Action-specific recommendations
+  - Color-coded action types
+- **Rule-Level Analysis** (top 50 rules):
+  - Total hits, blocks, allows, block rate
+  - **Effectiveness rating** (HIGHLY EFFECTIVE, EFFECTIVE, MODERATE, LOW, UNUSED)
+  - **Status recommendations** for optimization
+  - Color-coded effectiveness indicators
+- Action distribution visualization chart
+
+### 7. Client Analysis
+- Top 30 blocked IP addresses with detailed tracking
 - Bot traffic analysis (JA3/JA4 fingerprints)
-- User-Agent patterns
-- Hourly traffic patterns
+- User-Agent patterns analysis
+- Hourly traffic patterns with grouped bar charts
 
-### 6. LLM Recommendations
-- Template for AI-generated security findings
-- Structured format for prioritized recommendations
-- Action items organized by priority level
+### 8. LLM Recommendations
+- Professional template for AI-generated security findings
+- Four priority sections with color-coded headers:
+  - 🔴 Critical Findings (immediate action) - Red
+  - 🟠 High Priority (30 days) - Orange
+  - 🟡 Medium Priority (90 days) - Yellow
+  - 🟢 Low Priority (nice to have) - Green
+- Structured format with: Priority, Finding/Recommendation, Impact, Action Items
+- Pre-formatted with professional borders and alternating row colors
+
+### Professional Styling Features
+- ✅ Consistent professional blue theme (#1F4E78) throughout
+- ✅ 18pt titles with generation timestamps on every sheet
+- ✅ Alternating row colors for better readability
+- ✅ Professional borders on all data cells
+- ✅ Color-coded status indicators (green for good, red for issues, orange for warnings)
+- ✅ Auto-adjusted column widths for optimal display
+- ✅ Merged cells for section headers
+- ✅ Right-aligned numeric values for easy scanning
+- ✅ Embedded visualization charts at 150 DPI
 
 ## LLM Prompt Templates
 
