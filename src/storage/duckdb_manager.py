@@ -194,11 +194,20 @@ class DuckDBManager:
         scope = web_acl_data.get('Scope') or web_acl_data.get('scope')
 
         conn.execute("""
-            INSERT OR REPLACE INTO web_acls (
+            INSERT INTO web_acls (
                 web_acl_id, name, scope, default_action, description,
                 visibility_config, capacity, managed_by_firewall_manager,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (web_acl_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                scope = EXCLUDED.scope,
+                default_action = EXCLUDED.default_action,
+                description = EXCLUDED.description,
+                visibility_config = EXCLUDED.visibility_config,
+                capacity = EXCLUDED.capacity,
+                managed_by_firewall_manager = EXCLUDED.managed_by_firewall_manager,
+                updated_at = EXCLUDED.updated_at
         """, [
             web_acl_id,
             name,
@@ -228,10 +237,19 @@ class DuckDBManager:
             rule_id = f"{web_acl_id}_{rule.get('Name', 'unknown')}"
 
             conn.execute("""
-                INSERT OR REPLACE INTO rules (
+                INSERT INTO rules (
                     rule_id, web_acl_id, name, priority, rule_type,
                     action, visibility_config, statement, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (rule_id) DO UPDATE SET
+                    web_acl_id = EXCLUDED.web_acl_id,
+                    name = EXCLUDED.name,
+                    priority = EXCLUDED.priority,
+                    rule_type = EXCLUDED.rule_type,
+                    action = EXCLUDED.action,
+                    visibility_config = EXCLUDED.visibility_config,
+                    statement = EXCLUDED.statement,
+                    created_at = EXCLUDED.created_at
             """, [
                 rule_id,
                 web_acl_id,
@@ -261,9 +279,14 @@ class DuckDBManager:
         association_id = f"{web_acl_id}_{resource_arn}"
 
         conn.execute("""
-            INSERT OR REPLACE INTO resource_associations (
+            INSERT INTO resource_associations (
                 association_id, web_acl_id, resource_arn, resource_type, created_at
             ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (association_id) DO UPDATE SET
+                web_acl_id = EXCLUDED.web_acl_id,
+                resource_arn = EXCLUDED.resource_arn,
+                resource_type = EXCLUDED.resource_type,
+                created_at = EXCLUDED.created_at
         """, [association_id, web_acl_id, resource_arn, resource_type, datetime.utcnow()])
 
         logger.debug(f"Inserted resource association: {resource_type} - {resource_arn}")
@@ -294,10 +317,18 @@ class DuckDBManager:
             config_id = f"{web_acl_id}_{dest_type}"
 
             conn.execute("""
-                INSERT OR REPLACE INTO logging_configurations (
+                INSERT INTO logging_configurations (
                     config_id, web_acl_id, destination_type, destination_arn,
                     log_format, sampling_rate, redacted_fields, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (config_id) DO UPDATE SET
+                    web_acl_id = EXCLUDED.web_acl_id,
+                    destination_type = EXCLUDED.destination_type,
+                    destination_arn = EXCLUDED.destination_arn,
+                    log_format = EXCLUDED.log_format,
+                    sampling_rate = EXCLUDED.sampling_rate,
+                    redacted_fields = EXCLUDED.redacted_fields,
+                    created_at = EXCLUDED.created_at
             """, [
                 config_id,
                 web_acl_id,
