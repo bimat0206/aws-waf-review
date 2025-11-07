@@ -12,8 +12,8 @@ from datetime import datetime
 from botocore.exceptions import ClientError
 from tqdm import tqdm
 
-from ..utils.aws_helpers import get_logs_client, handle_aws_error
-from ..utils.time_helpers import datetime_to_timestamp
+from utils.aws_helpers import get_logs_client, handle_aws_error
+from utils.time_helpers import datetime_to_timestamp
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,18 @@
+{
+    "profiles": {
+        "default": {
+            "aws_region": "us-east-1",
+            "log_group_name": "vfbs-prod-common-acl-1",
+            "s3_bucket": "my-waf-logs-bucket",
+            "s3_prefix": "waf-logs/",
+            "log_source_type": "cloudwatchlogs"
+        }
+    },
+    "waf_sources": [
+        {
+            "name": "example-waf-acl",
+            "web_acl_id": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/example-waf/abcd1234-5678-efgh-ijkl-9876mnopqrst",
+            "region": "us-east-1",
+            "log_destination": "cloudwatchlogs"
+        }
+}

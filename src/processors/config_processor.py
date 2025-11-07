@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from botocore.exceptions import ClientError
 from tqdm import tqdm
 
-from ..utils.aws_helpers import (
+from utils.aws_helpers import (
     get_wafv2_client,
     handle_aws_error,
     determine_resource_type,

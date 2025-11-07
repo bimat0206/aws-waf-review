@@ -376,3 +376,9 @@ db.vacuum()  # Optimize after large operations
 - DuckDB: 0.10.0+
 - OS: macOS, Linux, Windows
 - Architecture: x86_64, ARM64
+## [1.0.4] - 2025-11-07
+
+### Fixed
+
+#### DuckDB Manager (`duckdb_manager.py`)
+- **Duplicate log_id collisions**: Bulk inserts now read `MAX(log_id)` and offset the next batch to ensure unique primary keys. Previously every batch started at `0`, so a second import triggered `Constraint Error: Duplicate key "log_id: 0"`.

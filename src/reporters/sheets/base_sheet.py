@@ -43,6 +43,7 @@ class BaseSheet:
             top=Side(style='medium', color='1F4E78'),
             bottom=Side(style='medium', color='1F4E78')
         )
+        self.viz = None
 
     def _apply_cell_style(self, cell, font=None, fill=None, border=None, alignment=None):
         """

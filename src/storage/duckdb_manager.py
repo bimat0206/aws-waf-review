@@ -364,11 +364,23 @@ class DuckDBManager:
 
         conn = self.connect()
 
+        # Determine starting log_id to avoid primary key collisions
+        try:
+            current_max = conn.execute("SELECT COALESCE(MAX(log_id), -1) FROM waf_logs").fetchone()[0]
+        except Exception as e:
+            logger.warning(f"Failed to read current max log_id: {e}, defaulting to -1")
+            current_max = -1
+
+        if current_max is None:
+            current_max = -1
+
+        start_id = (current_max or 0) + 1 if current_max >= 0 else 0
+
         # Prepare data for bulk insert
         insert_data = []
         for idx, entry in enumerate(log_entries):
             insert_data.append([
-                idx,  # log_id (will be replaced by actual ID)
+                start_id + idx,
                 entry.get('timestamp'),
                 entry.get('webaclId'),
                 entry.get('webaclName'),
