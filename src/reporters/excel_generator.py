@@ -97,13 +97,12 @@ class ExcelReportGenerator:
     def _format_data_cell(self, cell, value, highlight=False):
         """Format a data cell with professional styling."""
         cell.value = value
-        self._apply_cell_style(
-            cell,
-            font=self.data_font,
-            fill=self.highlight_fill if highlight else None,
-            border=self.thin_border,
-            alignment=Alignment(vertical='center', wrap_text=False)
-        )
+        cell.font = self.data_font
+        cell.border = self.thin_border
+        cell.alignment = Alignment(vertical='center', wrap_text=False)
+        # Only apply fill if highlight is True
+        if highlight:
+            cell.fill = self.highlight_fill
 
     def generate_report(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]],
                        resources: List[Dict[str, Any]], logging_configs: List[Dict[str, Any]],
@@ -529,12 +528,14 @@ class ExcelReportGenerator:
             ws[f'A{row}'] = metric_name
             ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
             ws[f'A{row}'].border = self.thin_border
-            ws[f'A{row}'].fill = self.highlight_fill if highlight else None
+            if highlight:
+                ws[f'A{row}'].fill = self.highlight_fill
 
             ws[f'B{row}'] = metric_value
             ws[f'B{row}'].font = Font(bold=True, size=11, color='1F4E78', name='Calibri')
             ws[f'B{row}'].border = self.thin_border
-            ws[f'B{row}'].fill = self.highlight_fill if highlight else None
+            if highlight:
+                ws[f'B{row}'].fill = self.highlight_fill
             ws[f'B{row}'].alignment = Alignment(horizontal='right', vertical='center')
 
             row += 1
@@ -866,12 +867,14 @@ class ExcelReportGenerator:
                 ws[f'A{row}'] = label
                 ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
                 ws[f'A{row}'].border = self.thin_border
-                ws[f'A{row}'].fill = self.highlight_fill if highlight else None
+                if highlight:
+                    ws[f'A{row}'].fill = self.highlight_fill
 
                 ws[f'B{row}'] = value
                 ws[f'B{row}'].font = self.data_font
                 ws[f'B{row}'].border = self.thin_border
-                ws[f'B{row}'].fill = self.highlight_fill if highlight else None
+                if highlight:
+                    ws[f'B{row}'].fill = self.highlight_fill
                 row += 1
 
             row += 1
@@ -1072,12 +1075,14 @@ class ExcelReportGenerator:
                 ws[f'A{row}'] = label
                 ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
                 ws[f'A{row}'].border = self.thin_border
-                ws[f'A{row}'].fill = self.highlight_fill if highlight else None
+                if highlight:
+                    ws[f'A{row}'].fill = self.highlight_fill
 
                 ws[f'B{row}'] = value
                 ws[f'B{row}'].font = Font(bold=True, size=10, color='1F4E78', name='Calibri')
                 ws[f'B{row}'].border = self.thin_border
-                ws[f'B{row}'].fill = self.highlight_fill if highlight else None
+                if highlight:
+                    ws[f'B{row}'].fill = self.highlight_fill
                 ws[f'B{row}'].alignment = Alignment(horizontal='right', vertical='center')
                 row += 1
 
