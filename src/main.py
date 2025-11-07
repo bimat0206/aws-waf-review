@@ -12,6 +12,7 @@ import logging
 import argparse
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List
 import coloredlogs
 
 from storage.duckdb_manager import DuckDBManager
@@ -383,29 +384,42 @@ def fetch_logs_from_s3(db_manager: DuckDBManager, bucket: str, prefix: str,
     logger.info(f"Successfully stored {len(parsed_logs)} log entries")
 
 
-def generate_excel_report(db_manager: DuckDBManager, output_path: str):
+def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_web_acl_ids: Optional[List[str]] = None):
     """
     Generate Excel report with visualizations.
 
     Args:
         db_manager (DuckDBManager): Database manager instance
         output_path (str): Path to save Excel report
+        selected_web_acl_ids (Optional[List[str]]): List of Web ACL IDs to include in report. If None, includes all.
     """
-    logger.info("Generating Excel report...")
+    if selected_web_acl_ids:
+        logger.info(f"Generating Excel report for {len(selected_web_acl_ids)} Web ACL(s)...")
+    else:
+        logger.info("Generating Excel report for all Web ACLs...")
 
-    # Calculate metrics
-    calculator = MetricsCalculator(db_manager)
+    # Calculate metrics with Web ACL filter
+    calculator = MetricsCalculator(db_manager, web_acl_ids=selected_web_acl_ids)
     metrics = calculator.calculate_all_metrics()
 
     # Get Web ACL data
     conn = db_manager.get_connection()
 
-    web_acls = conn.execute("SELECT * FROM web_acls").fetchall()
+    # Filter Web ACLs if specific ones selected
+    if selected_web_acl_ids:
+        # Escape single quotes in IDs
+        escaped_ids = [id.replace("'", "''") for id in selected_web_acl_ids]
+        ids_str = "', '".join(escaped_ids)
+        web_acl_filter = f"WHERE web_acl_id IN ('{ids_str}')"
+    else:
+        web_acl_filter = ""
+
+    web_acls = conn.execute(f"SELECT * FROM web_acls {web_acl_filter}").fetchall()
     web_acls_list = [dict(zip(['web_acl_id', 'name', 'scope', 'default_action', 'description',
                                'visibility_config', 'capacity', 'managed_by_firewall_manager',
                                'created_at', 'updated_at'], row)) for row in web_acls]
 
-    resources = conn.execute("SELECT * FROM resource_associations").fetchall()
+    resources = conn.execute(f"SELECT * FROM resource_associations {web_acl_filter}").fetchall()
     resources_list = [dict(zip(['association_id', 'web_acl_id', 'resource_arn',
                                 'resource_type', 'created_at'], row)) for row in resources]
 
@@ -414,7 +428,7 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str):
     for resource in resources_list:
         resource['web_acl_name'] = web_acl_names.get(resource['web_acl_id'], 'Unknown')
 
-    logging_configs = conn.execute("SELECT * FROM logging_configurations").fetchall()
+    logging_configs = conn.execute(f"SELECT * FROM logging_configurations {web_acl_filter}").fetchall()
     logging_configs_list = [dict(zip(['config_id', 'web_acl_id', 'destination_type',
                                      'destination_arn', 'log_format', 'sampling_rate',
                                      'redacted_fields', 'created_at'], row)) for row in logging_configs]
@@ -763,13 +777,51 @@ def main():
                         print("Please fetch WAF configurations first (Option 1)")
                         continue
 
-                    # Ask for output filename
+                    # Auto-generate output filename
                     timestamp = format_datetime(datetime.now(), 'filename')
-                    default_output = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
-                    output_path = input(f"\nEnter output filename (press Enter for '{default_output}'): ").strip()
-                    output_path = output_path or default_output
+                    output_path = f"{dir_paths['output']}/{account_id}_{timestamp}_waf_report.xlsx"
 
-                    generate_excel_report(db_manager, output_path)
+                    # Get list of Web ACLs for selection
+                    conn = db_manager.get_connection()
+                    web_acls = conn.execute("SELECT web_acl_id, name, scope FROM web_acls ORDER BY name").fetchall()
+
+                    if not web_acls:
+                        print("\n⚠️  No Web ACLs found in database.")
+                        print("Please fetch WAF configurations first (Option 1)")
+                        continue
+
+                    # Display Web ACLs and let user select
+                    print("\n📋 Available Web ACLs:")
+                    print("="*80)
+                    for idx, (web_acl_id, name, scope) in enumerate(web_acls, 1):
+                        print(f"{idx}. {name} (Scope: {scope})")
+                    print(f"{len(web_acls) + 1}. All Web ACLs")
+                    print("="*80)
+
+                    while True:
+                        choice_input = input(f"\nSelect Web ACL to export (1-{len(web_acls) + 1}): ").strip()
+                        try:
+                            selection = int(choice_input)
+                            if 1 <= selection <= len(web_acls) + 1:
+                                break
+                            else:
+                                print(f"❌ Please enter a number between 1 and {len(web_acls) + 1}")
+                        except ValueError:
+                            print("❌ Please enter a valid number")
+
+                    # Determine which Web ACL(s) to export
+                    if selection == len(web_acls) + 1:
+                        # Export all Web ACLs
+                        selected_web_acl_ids = None
+                        print(f"\n📊 Generating report for all Web ACLs...")
+                    else:
+                        # Export specific Web ACL
+                        selected_web_acl_id = web_acls[selection - 1][0]
+                        selected_web_acl_name = web_acls[selection - 1][1]
+                        selected_web_acl_ids = [selected_web_acl_id]
+                        print(f"\n📊 Generating report for Web ACL: {selected_web_acl_name}...")
+
+                    generate_excel_report(db_manager, output_path, selected_web_acl_ids)
 
                     print(f"\n✓ Excel report generated: {output_path}")
                     print("\nNext steps:")
