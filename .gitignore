@@ -1,32 +1,82 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
-*.dylib
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Test binary, built with `go test -c`
-*.test
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
 
-# Code coverage profiles and other test artifacts
-*.out
-coverage.*
-*.coverprofile
-profile.cov
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Application Data Directories
+data/
+output/
+logs/
+llm_prompts/
 
-# Go workspace file
-go.work
-go.work.sum
+# Database Files
+*.db
+*.duckdb
+*.duckdb.wal
 
-# env file
+# Excel Reports
+*.xlsx
+*.xls
+
+# Log Files
+*.log
+
+# Environment Files
 .env
+.env.local
+.env.*.local
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db

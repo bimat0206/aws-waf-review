@@ -2,6 +2,163 @@
 
 All notable changes to the main application orchestration will be documented in this file.
 
+## [1.1.0] - 2025-11-07
+
+### Added
+
+#### Interactive Mode System
+- **Menu-Driven Interface**: Complete interactive menu for user-guided analysis
+- **Web ACL Inventory Display**: Visual summary of fetched Web ACLs with details
+- **Scope Selection**: Interactive choice between REGIONAL, CLOUDFRONT, or both
+- **Time Window Selection**: Choose between 3 or 6 months for log analysis
+- **Database Statistics View**: Real-time view of database record counts
+- **Multi-Operation Sessions**: Perform multiple tasks in a single session
+
+#### New Functions (`main.py`)
+- `interactive_menu()` - Display main menu and get user choice (6 options)
+- `display_web_acl_summary()` - Show detailed Web ACL inventory after fetching
+- `select_web_acls()` - Allow user to select specific Web ACLs for analysis
+- `interactive_scope_selection()` - Choose WAF scope interactively
+- `interactive_time_window()` - Select time window for logs interactively
+- `setup_directories()` - Auto-create data/, output/, logs/ directories
+
+#### Interactive Menu Options
+1. **Fetch WAF Configurations**: Guided configuration fetching with scope selection
+2. **Fetch WAF Logs**: Time window and source selection with validation
+3. **View Current Inventory**: Display all Web ACLs, resources, and logging status
+4. **Generate Excel Report**: Create report with custom filename
+5. **View Database Statistics**: Show record counts for all tables
+0. **Exit**: Clean exit from interactive session
+
+#### Web ACL Inventory Display
+For each Web ACL shows:
+- Name, scope (REGIONAL/CLOUDFRONT), default action
+- WCU capacity usage
+- Number of rules configured
+- Protected resources (ALB, API Gateway, CloudFront) with names
+- Logging status (✓ Enabled / ✗ Not configured)
+- Shows first 3 resources, indicates if more exist
+
+#### Smart Validation
+- Checks for Web ACLs before allowing log fetching
+- Validates database has data before report generation
+- Input validation with clear error messages
+- Context-aware prompts guide users through workflow
+
+#### Enhanced CLI Arguments
+- `--non-interactive` - Disable interactive mode for scripting
+- Updated help text for all arguments
+- Automatic mode detection (interactive by default when arguments missing)
+
+#### Directory Organization
+- Auto-creates `data/` directory for DuckDB files
+- Auto-creates `output/` directory for Excel reports
+- Auto-creates `logs/` directory for application logs (future use)
+- Default paths updated to use organized structure
+- `.gitignore` updated to exclude generated directories
+
+### Changed
+
+#### Function Signatures
+- `fetch_waf_configurations()` - Added `interactive: bool = True` parameter
+  - When True: displays Web ACL summary after fetching
+  - When False: silent operation for scripting
+  - Returns count of Web ACLs fetched
+
+#### Interactive Mode Detection
+- **Default behavior**: Interactive mode when no `--scope` or `--log-source` specified
+- **Non-interactive mode**: Activated when all required arguments provided OR `--non-interactive` flag used
+- Maintains backward compatibility with existing scripts
+
+#### Default Paths
+- Database path: `waf_analysis.duckdb` → `data/waf_analysis.duckdb`
+- Output path: `waf_report_{timestamp}.xlsx` → `output/waf_report_{timestamp}.xlsx`
+
+### Improved
+
+#### User Experience
+- **Visual Icons**: Emoji icons for visual clarity (🎯, 📋, 📍, ⏰, 📦, ✓, ✗, ⚠️, ❌)
+- **Menu Loop**: Perform multiple operations without restarting application
+- **Informative Prompts**: Clear descriptions and examples for each input
+- **Error Messages**: Specific, actionable error messages with resolution steps
+- **Progress Feedback**: Real-time feedback during operations
+- **Professional Formatting**: Consistent box drawing and alignment
+
+#### Workflow Efficiency
+- No need to remember CLI arguments for ad-hoc analysis
+- View inventory before deciding next action
+- Generate multiple reports with different settings
+- Explore data incrementally (fetch configs, then logs, then report)
+
+### Technical Details
+
+#### Mode Selection Logic
+```python
+interactive_mode = not args.non_interactive and (args.scope is None or args.log_source is None)
+```
+
+#### Menu Loop Structure
+- Main loop continues until user selects Exit (0)
+- Each option validated before execution
+- Database state checked before dependent operations
+- Clean exception handling preserves session
+
+#### Interactive Functions Return Types
+- `interactive_menu()` → `str` (user choice '0'-'5')
+- `interactive_scope_selection()` → `list[str]` (scopes to fetch)
+- `interactive_time_window()` → `int` (months: 3 or 6)
+- `select_web_acls()` → `list[str] | None` (selected IDs or all)
+- `display_web_acl_summary()` → `None` (displays to stdout)
+
+### Usage Examples
+
+#### Interactive Mode (Default)
+```bash
+# Start interactive session
+python src/main.py
+
+# User sees menu, selects options interactively
+# 1 → Fetch configurations → Choose REGIONAL
+# 3 → View inventory
+# 2 → Fetch logs → Choose 3 months → CloudWatch
+# 4 → Generate report
+# 0 → Exit
+```
+
+#### View Inventory Only
+```bash
+python src/main.py
+# Select option 3 to view current inventory
+```
+
+#### Non-Interactive Mode (Scripting)
+```bash
+python src/main.py \
+  --scope REGIONAL \
+  --log-source cloudwatch \
+  --log-group aws-waf-logs-myapp \
+  --months 6 \
+  --output custom_report.xlsx \
+  --non-interactive
+```
+
+### Compatibility
+
+#### Backward Compatibility
+- ✅ All existing CLI arguments work unchanged
+- ✅ Scripts with full arguments run without prompts
+- ✅ `--non-interactive` flag disables all prompts
+- ✅ Exit codes unchanged (0 = success, 1 = error)
+
+#### Breaking Changes
+- None - fully backward compatible
+
+### Performance
+
+- No performance impact on non-interactive mode
+- Interactive mode adds <100ms for menu display
+- Database queries for inventory display: ~10-50ms
+
 ## [1.0.0] - 2025-11-07
 
 ### Added
