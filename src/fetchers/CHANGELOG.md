@@ -2,6 +2,49 @@
 
 All notable changes to the fetchers module will be documented in this file.
 
+## [1.0.1] - 2025-11-07
+
+### Fixed
+
+#### Region-Aware CloudWatch Fetching
+- **Issue**: CloudWatch log fetching failed when user's current AWS region differed from log group's region
+- **Impact**: CloudFront WAF logs (typically in us-east-1) failed when user was in other regions
+- **Fix**: Added optional `region` parameter to `CloudWatchFetcher.__init__()`
+- **Usage**: Can now instantiate fetcher with specific region: `CloudWatchFetcher(region='us-east-1')`
+- **Backward Compatibility**: Region parameter is optional; defaults to current AWS CLI region if not provided
+
+### Changed
+
+#### CloudWatchFetcher Constructor
+- Added optional `region` parameter to `__init__()` method
+- Fetcher now creates region-specific CloudWatch Logs client when region is provided
+- Enables cross-region log fetching without changing AWS CLI configuration
+
+### Technical Details
+
+#### Before (v1.0.0)
+```python
+class CloudWatchFetcher:
+    def __init__(self):
+        self.logs_client = get_logs_client()  # Uses current region
+```
+
+#### After (v1.0.1)
+```python
+class CloudWatchFetcher:
+    def __init__(self, region: str = None):
+        if region:
+            self.logs_client = get_logs_client(region=region)
+        else:
+            self.logs_client = get_logs_client()
+```
+
+### Integration
+
+#### Used By
+- `main.py` - `get_cloudwatch_log_groups_from_db()` extracts region from log group ARN
+- Log fetching now uses: `CloudWatchFetcher(region=log_group_region)`
+
 ## [1.0.0] - 2025-11-07
 
 ### Added

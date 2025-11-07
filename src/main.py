@@ -57,7 +57,11 @@ def setup_directories(account_id: str = None):
         - data/ or data/{account_id}/ : For DuckDB database files
         - output/ or output/{account_id}/ : For Excel reports and exports
         - logs/ or logs/{account_id}/ : For application logs
-        - config/prompts/ or config/prompts/{account_id}/ : For exported prompt data
+        - exported-prompt/ or exported-prompt/{account_id}/ : For exported LLM prompts with WAF data
+
+    Note:
+        - config/prompts/ contains prompt templates (version controlled)
+        - exported-prompt/ contains filled prompts with account data (gitignored)
 
     Returns:
         dict: Dictionary containing created directory paths
@@ -68,7 +72,7 @@ def setup_directories(account_id: str = None):
             'data': f'data/{account_id}',
             'output': f'output/{account_id}',
             'logs': f'logs/{account_id}',
-            'prompts': f'config/prompts/{account_id}'
+            'exported_prompts': f'exported-prompt/{account_id}'
         }
         logger.info(f"Setting up account-specific directories for AWS Account: {account_id}")
     else:
@@ -77,7 +81,7 @@ def setup_directories(account_id: str = None):
             'data': 'data',
             'output': 'output',
             'logs': 'logs',
-            'prompts': 'config/prompts'
+            'exported_prompts': 'exported-prompt'
         }
 
     created_paths = {}

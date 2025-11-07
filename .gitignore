@@ -42,7 +42,7 @@ data/
 output/
 logs/
 llm_prompts/
-config/prompts/*/  # Account-specific prompt exports
+exported-prompt/  # Account-specific exported prompts with WAF data
 
 # Database Files
 *.db

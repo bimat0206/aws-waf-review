@@ -10,7 +10,7 @@ All notable changes to the main application orchestration will be documented in 
 - **Account-Specific Directories**: Automatically creates subdirectories organized by AWS Account ID
 - **Database Segregation**: Each AWS account gets its own database file with account ID prefix
 - **Report Organization**: Excel reports saved in account-specific directories with account ID and timestamp
-- **Prompt Export Organization**: Account-specific subdirectories for exported LLM prompt data
+- **Prompt Export Organization**: Account-specific subdirectories for exported LLM prompts with injected WAF data
 
 #### Directory Structure
 When running the tool, it now creates:
@@ -18,8 +18,12 @@ When running the tool, it now creates:
 data/{account_id}/{account_id}_waf_analysis.duckdb
 output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx
 logs/{account_id}/
-config/prompts/{account_id}/
+exported-prompt/{account_id}/
 ```
+
+**Note**:
+- `config/prompts/` contains prompt templates (version controlled)
+- `exported-prompt/{account_id}/` contains filled prompts with account-specific WAF data (gitignored)
 
 **Benefits**:
 - **Clean Separation**: Data from different AWS accounts never mixed
@@ -47,7 +51,7 @@ config/prompts/{account_id}/
 - **Database Path**: `data/waf_analysis.duckdb` → `data/{account_id}/{account_id}_waf_analysis.duckdb`
 - **Output Path**: `output/waf_report_{timestamp}.xlsx` → `output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx`
 - **Logs Path**: `logs/` → `logs/{account_id}/`
-- **Prompts Path**: `config/prompts/` → `config/prompts/{account_id}/`
+- **Exported Prompts Path**: `exported-prompt/` → `exported-prompt/{account_id}/`
 
 #### CLI Argument Help Text
 - Updated `--db-path` help to show new default format
@@ -86,7 +90,7 @@ dir_paths = setup_directories(account_id)
     'data': 'data/123456789012',
     'output': 'output/123456789012',
     'logs': 'logs/123456789012',
-    'prompts': 'config/prompts/123456789012'
+    'exported_prompts': 'exported-prompt/123456789012'
 }
 ```
 
