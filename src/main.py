@@ -27,6 +27,7 @@ from processors.log_parser import WAFLogParser
 from processors.metrics_calculator import MetricsCalculator
 from reporters.excel_generator import ExcelReportGenerator
 from reporters.prompt_exporter import PromptExporter
+from reporters.raw_logs_exporter import RawLogsExporter
 from utils.aws_helpers import (
     verify_aws_credentials,
     get_session_info,
@@ -379,6 +380,7 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
                                raw_logs_dir: Optional[str] = None):
     """
     Fetch logs from CloudWatch and store in database.
+    Also exports raw logs to JSON Lines format.
 
     Args:
         db_manager (DuckDBManager): Database manager instance
@@ -401,15 +403,28 @@ def fetch_logs_from_cloudwatch(db_manager: DuckDBManager, log_group_name: str,
 
     logger.info(f"Fetched {len(log_events)} log events")
 
-    # Export raw events for troubleshooting
-    export_raw_logs(
-        log_events,
-        raw_logs_dir,
-        source='cloudwatch',
-        identifier=log_group_name,
-        start_time=start_time,
-        end_time=end_time
-    )
+    # Export raw logs immediately after fetching
+    try:
+        session_info = get_session_info()
+        account_id = session_info.get('account_id')
+        account_alias = session_info.get('account_alias')
+        account_identifier = get_account_identifier(account_id, account_alias)
+
+        # Export to output directory with account identifier
+        output_dir = f"output/{account_identifier}/raw_logs"
+
+        logger.info("📦 Exporting raw CloudWatch logs...")
+        exporter = RawLogsExporter()
+        exported_file = exporter.export_raw_logs_by_web_acl(
+            log_events,
+            output_dir,
+            log_source_name=log_group_name
+        )
+
+        if exported_file:
+            logger.info(f"✅ Raw logs exported successfully")
+    except Exception as e:
+        logger.warning(f"Failed to export raw logs (continuing with processing): {e}")
 
     # Parse logs
     parsed_logs = parser.parse_batch(log_events, source='cloudwatch')

@@ -2,16 +2,84 @@
 
 All notable changes to the reporters module will be documented in this file.
 
-## [1.1.1] - 2025-11-07
+## [1.2.0] - 2025-11-07
 
 ### Added
-
-- **Prompt Exporter JSON Injection**: Prompt exports now include serialized rule inventories, traffic distributions, attack patterns, and compliance data directly inside the markdown templates.
+- **Rule Implementation Summary** section in Inventory sheet
+  - Total rules configured counter
+  - Rules by Type breakdown table with percentages
+  - Rules by Action breakdown table with percentages
+  - Color-coded actions (Red for BLOCK, Green for ALLOW, Orange for CAPTCHA/CHALLENGE)
+- **Geographic Distribution of Blocked Traffic** sheet (NEW)
+  - Blocked traffic summary statistics
+  - Top 30 countries by blocked requests
+  - Threat level assessment (CRITICAL, HIGH, MEDIUM, LOW)
+  - Risk assessment for each country
+  - Color-coded threat levels
+  - Geographic visualization chart
+- **Rule Action Distribution** sheet (NEW)
+  - Overall action distribution analysis with security impact
+  - Action-specific recommendations
+  - Rule-level effectiveness analysis (top 50 rules)
+  - Effectiveness ratings (HIGHLY EFFECTIVE, EFFECTIVE, MODERATE, LOW, UNUSED)
+  - Status recommendations for rule optimization
+  - Action distribution visualization chart
+- **Base Sheet Infrastructure** for modular design
+  - `BaseSheet` class with shared styling and formatting methods
+  - Modular sheet architecture in `src/reporters/sheets/` package
+  - Helper methods for consistent formatting across all sheets
 
 ### Changed
+- Enhanced all sheets with professional styling theme
+  - Consistent professional blue color scheme (#1F4E78)
+  - Alternating row colors for better readability
+  - Professional borders on all data cells
+  - 18pt titles with generation timestamps
+  - Proper alignment and number formatting
+  - Merged cells for section headers
+- Updated sheet generation order to include new analytical sheets
+- Improved column widths for optimal display across all sheets
 
-- **Prompt Export API**: `PromptExporter.export_all_prompts()` accepts logging configuration metadata so compliance prompts can describe destinations without manual edits.
-- **Structured Placeholders**: Single-brace placeholders like `{current_rules}` and `{rule_metrics}` are automatically replaced during export, keeping all templates synchronized with the latest WAF metrics.
+### Fixed
+- **CRITICAL**: Resolved openpyxl Fill error when saving Excel reports
+  - Fixed TypeError: "expected <class 'openpyxl.styles.fills.Fill'>"
+  - Changed conditional fill assignments from `fill = value if condition else None` to `if condition: fill = value`
+  - Fixed 6 instances across Executive Summary, Geographic Blocked Traffic, and Client Analysis sheets
+  - _format_data_cell() method now properly handles fill assignments
+
+### Enhanced
+- Executive Summary sheet now includes:
+  - Web ACLs Overview section with detailed configuration
+  - Enhanced Key Security Metrics with alternating row highlighting
+  - Color-coded Security Posture Score (Green ≥80, Orange ≥60, Red <60)
+- Inventory sheet now includes:
+  - Comprehensive Rule Implementation Summary
+  - Detailed rules analysis by type and action
+  - Professional section headers and organization
+- All data tables now feature:
+  - Alternating row colors (light gray highlight)
+  - Professional borders and alignment
+  - Color-coded status indicators
+  - Better visual hierarchy
+
+## [1.1.0] - 2025-11-07
+
+### Added
+- Prompt Export functionality (`prompt_exporter.py`)
+  - `PromptExporter` class for LLM prompt generation
+  - Template processing from `config/prompts/` directory
+  - Data injection with placeholder replacement
+  - Export to `exported-prompt/{account_identifier}/` directory
+- Enhanced resource fetching in config processor
+  - Support for all AWS resource types (APPLICATION_LOAD_BALANCER, API_GATEWAY, CLOUDFRONT, APPSYNC, COGNITO_USER_POOL, APP_RUNNER_SERVICE, VERIFIED_ACCESS_INSTANCE)
+  - Improved logging with informative messages
+  - Better error handling for unsupported resource types
+
+### Changed
+- Excel report now includes complete data from database
+- Inventory sheet displays rules and rule groups inside Web ACL
+- Executive Summary includes basic Web ACL information
+- Improved professional styling and readability throughout all sheets
 
 ## [1.0.0] - 2025-11-07
 
