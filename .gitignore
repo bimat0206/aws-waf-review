@@ -42,6 +42,7 @@ data/
 output/
 logs/
 llm_prompts/
+exported-prompt/  # Account-specific exported prompts with WAF data
 
 # Database Files
 *.db

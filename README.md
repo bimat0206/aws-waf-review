@@ -5,7 +5,10 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 ## Features
 
 - **Zero Persistent Connections**: Fetches all data once and stores it locally in DuckDB
+- **Multi-Account Support**: Organized directory structure with account-specific data separation
 - **Multi-Source Log Collection**: Supports both CloudWatch Logs and S3 as log sources
+- **Auto-Detect CloudWatch Logs**: Automatically discovers log groups from Web ACL configurations
+- **Flexible Time Windows**: Today, yesterday, past week, 3/6 months, or custom date ranges
 - **Comprehensive Analysis**: Analyzes WAF configurations, rules, traffic patterns, and attack types
 - **Rich Excel Reports**: Generates multi-sheet Excel workbooks with visualizations
 - **LLM-Ready**: Includes prompt templates for AI-powered security analysis
@@ -17,22 +20,26 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 
 ```
 aws-waf-analyzer/
-├── config/                  # Configuration files
-│   ├── prompts/            # LLM prompt templates
+├── config/                        # Configuration files
+│   ├── prompts/                  # LLM prompt templates (version controlled)
 │   │   ├── security_effectiveness.md
 │   │   ├── false_positive_analysis.md
 │   │   ├── rule_optimization.md
 │   │   └── compliance_gap_analysis.md
-│   └── waf_schema.json     # WAF log schema definition
-├── src/                    # Source code
-│   ├── fetchers/          # Data fetching modules
-│   ├── processors/        # Data processing modules
-│   ├── storage/           # Database management
-│   ├── reporters/         # Report generation
-│   ├── utils/             # Utility functions
-│   └── main.py           # Main orchestration script
-├── requirements.txt       # Python dependencies
-└── README.md             # This file
+│   └── waf_schema.json           # WAF log schema definition
+├── src/                          # Source code
+│   ├── fetchers/                # Data fetching modules
+│   ├── processors/              # Data processing modules
+│   ├── storage/                 # Database management
+│   ├── reporters/               # Report generation
+│   ├── utils/                   # Utility functions
+│   └── main.py                  # Main orchestration script
+├── data/{account_id}/            # Account-specific DuckDB files (auto-created)
+├── output/{account_id}/          # Account-specific Excel reports (auto-created)
+├── logs/{account_id}/            # Account-specific application logs (auto-created)
+├── exported-prompt/{account_id}/ # Filled prompts with WAF data (gitignored, auto-created)
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
 ### System Architecture
@@ -515,9 +522,11 @@ You'll see an interactive menu:
    - View detailed inventory of Web ACLs and protected resources
 2. Select **Option 3** to review what was fetched
 3. Select **Option 2** to fetch logs
-   - Choose time window: 3 or 6 months
-   - Select log source: CloudWatch or S3
+   - Choose time window: today, yesterday, past week, 3 months, 6 months, or custom range
+   - Select log source: CloudWatch (auto-detected from database) or S3
+   - CloudWatch log groups automatically discovered from Web ACL logging configurations
 4. Select **Option 4** to generate Excel report
+   - Reports saved as `{account_id}_{timestamp}_waf_report.xlsx`
 5. Select **Option 0** to exit
 
 **Advantages of interactive mode:**
@@ -547,16 +556,20 @@ python3 waf-analyzer.py \
 python3 waf-analyzer.py [OPTIONS]
 
 Options:
-  --db-path PATH          Path to DuckDB database file (default: data/waf_analysis.duckdb)
+  --db-path PATH          Path to DuckDB database file
+                          (default: data/{account_id}/{account_id}_waf_analysis.duckdb)
   --months {3,6}          Number of months of logs to analyze (3 or 6)
+                          Note: Interactive mode offers more options (today, yesterday, week, custom)
   --scope {REGIONAL,CLOUDFRONT}  WAF scope to analyze
   --skip-config           Skip fetching WAF configurations
   --skip-logs             Skip fetching logs
   --log-source {cloudwatch,s3}  Log source (cloudwatch or s3)
   --log-group NAME        CloudWatch log group name
+                          Note: Interactive mode auto-detects from Web ACL logging config
   --s3-bucket NAME        S3 bucket name
   --s3-prefix PREFIX      S3 key prefix
-  --output PATH           Output Excel report filename (default: output/waf_report_<timestamp>.xlsx)
+  --output PATH           Output Excel report filename
+                          (default: output/{account_id}/{account_id}_{timestamp}_waf_report.xlsx)
   --non-interactive       Run in non-interactive mode (no prompts)
 ```
 
@@ -632,18 +645,24 @@ After fetching configurations in interactive mode, you'll see a detailed invento
 
 ### Directory Structure
 
-The tool automatically creates and uses the following directory structure:
+The tool automatically creates and uses the following account-specific directory structure:
 
 ```
 aws-waf-review/
-├── data/                     # DuckDB database files (auto-created)
-│   └── waf_analysis.duckdb
-├── output/                   # Excel reports (auto-created)
-│   └── waf_report_20251107_123456.xlsx
-└── logs/                     # Application logs (future use, auto-created)
+├── data/{account_id}/        # Account-specific DuckDB files (auto-created)
+│   └── {account_id}_waf_analysis.duckdb
+├── output/{account_id}/      # Account-specific Excel reports (auto-created)
+│   └── {account_id}_20251107_123456_waf_report.xlsx
+├── logs/{account_id}/        # Account-specific application logs (auto-created)
+└── exported-prompt/{account_id}/  # Filled prompts with WAF data (auto-created, gitignored)
 ```
 
-All generated files are excluded from git via `.gitignore`.
+**Multi-Account Organization:**
+- Each AWS account gets separate subdirectories for complete data isolation
+- Account ID automatically detected using AWS STS
+- Database files named with account ID prefix: `{account_id}_waf_analysis.duckdb`
+- Reports include account ID and timestamp: `{account_id}_{timestamp}_waf_report.xlsx`
+- All generated files are excluded from git via `.gitignore`
 
 ## Excel Report Structure
 
@@ -870,6 +889,15 @@ Contributions are welcome! Areas for improvement:
 MIT License - See LICENSE file for details
 
 ## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+### Version 1.1.0 (Current)
+- Multi-account support with organized directory structure
+- Enhanced time window selection (today, yesterday, week, custom)
+- Auto-detect CloudWatch log groups from Web ACL configurations
+- Region-aware CloudWatch log fetching
+- Bug fixes for JSON serialization and cross-region log access
 
 ### Version 1.0.0 (Initial Release)
 - Complete WAF configuration analysis
