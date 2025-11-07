@@ -2,6 +2,76 @@
 
 All notable changes to the main application orchestration will be documented in this file.
 
+## [1.2.1] - 2025-11-07
+
+### Fixed
+
+#### CRITICAL: CloudWatch Log Fetching with Wrong Region
+- **Issue**: CloudWatch log groups were being queried using the user's current AWS region instead of the region where the logs are stored
+- **Impact**: CloudFront WAF logs (stored in us-east-1 or other regions) would fail with `ResourceNotFoundException` when user's current region was different
+- **Root Cause**: Auto-detection feature extracted log group names but not regions from ARNs
+- **Fix**: Updated `get_cloudwatch_log_groups_from_db()` to extract and return region from CloudWatch log group ARN
+- **Implementation**: Parse region from ARN format `arn:aws:logs:REGION:account:log-group:NAME`
+- **User Impact**: Now displays region for each log group and uses correct region when fetching logs
+
+#### Changes Made
+- **Function Signature**: `get_cloudwatch_log_groups_from_db()` now returns `(log_group_name, web_acl_name, web_acl_id, region)` instead of `(log_group_name, web_acl_name, web_acl_id)`
+- **Display Enhancement**: Log group menu now shows region for each log group
+- **Fetcher Creation**: CloudWatchFetcher now instantiated with correct region when using database log groups
+- **Region Extraction**: Added ARN parsing logic to extract region from position 3 in colon-separated ARN
+
+#### User Experience
+**Before (Broken)**:
+```
+📋 CloudWatch log groups from Web ACL configurations:
+1. aws-waf-logs-CreatedByCloudFront-60550345
+    Web ACL: CreatedByCloudFront-60550345
+
+Enter choice (1-2): 1
+ERROR: ResourceNotFoundException - The specified log group does not exist.
+```
+
+**After (Fixed)**:
+```
+📋 CloudWatch log groups from Web ACL configurations:
+1. aws-waf-logs-CreatedByCloudFront-60550345
+    Web ACL: CreatedByCloudFront-60550345
+    Region: us-east-1
+
+Enter choice (1-2): 1
+Using region us-east-1 for CloudWatch log group
+✓ Successfully fetched logs
+```
+
+#### Technical Details
+
+**ARN Parsing Logic**:
+```python
+# ARN format: arn:partition:service:region:account:resource
+arn_parts = dest_arn.split(':')
+region = arn_parts[3]  # Region is at index 3
+log_group_part = dest_arn.split(':log-group:')[1]
+log_group_name = log_group_part.rstrip(':*')
+```
+
+**Region Usage**:
+```python
+if log_group_region:
+    fetcher = CloudWatchFetcher(region=log_group_region)
+    log_events = fetcher.get_log_events(log_group_name, start_time, end_time)
+else:
+    # Use current region for manually entered log groups
+    fetch_logs_from_cloudwatch(db_manager, log_group_name, start_time, end_time)
+```
+
+### Testing
+
+Created comprehensive test validating:
+- ✅ Region extraction from various ARN formats
+- ✅ Handling of trailing `:*` in ARNs
+- ✅ Different region values (us-east-1, ap-southeast-1, eu-west-1)
+- ✅ CloudFront WAF log group names
+
 ## [1.2.0] - 2025-11-07
 
 ### Added
