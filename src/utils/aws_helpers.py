@@ -8,7 +8,7 @@ profile detection, region management, and account information retrieval.
 import boto3
 import logging
 from typing import Optional, Dict, Any
-from botocore.exceptions import ClientError, ProfileNotFound
+from botocore.exceptions import ClientError, ProfileNotFound, NoCredentialsError
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def get_account_id() -> Optional[str]:
         account_id = response['Account']
         logger.info(f"AWS Account ID: {account_id}")
         return account_id
-    except ClientError as e:
+    except (ClientError, NoCredentialsError) as e:
         logger.error(f"Error getting account ID: {e}")
         return None
 
@@ -99,6 +99,9 @@ def get_account_alias() -> Optional[str]:
         else:
             logger.warning(f"Error getting account alias: {e}")
         return None
+    except NoCredentialsError:
+        logger.warning("No AWS credentials available to retrieve account alias")
+        return None
 
 
 def verify_aws_credentials() -> bool:
@@ -114,7 +117,7 @@ def verify_aws_credentials() -> bool:
         logger.info(f"AWS credentials verified for account: {response['Account']}")
         logger.info(f"Identity ARN: {response['Arn']}")
         return True
-    except (ClientError, ProfileNotFound) as e:
+    except (ClientError, ProfileNotFound, NoCredentialsError) as e:
         logger.error(f"AWS credentials verification failed: {e}")
         return False
 

@@ -5,6 +5,17 @@ All notable changes to the AWS WAF Security Analysis Tool will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-07
+
+### Added
+
+- **Data-Rich Prompt Exports**: Prompt exporter now injects real metrics, rule inventories, cost summaries, and attack trends into every template, eliminating manual placeholder replacement before sharing with LLMs.
+
+### Changed
+
+- **Prompt Export API**: `PromptExporter.export_all_prompts()` now accepts logging configuration metadata so each compliance prompt includes accurate destination details.
+- **Optional Colored Logging**: The tool now falls back to Python's standard logging formatter when `coloredlogs` is not installed, making quick runs on new environments smoother.
+
 ## [1.2.0] - 2025-11-07
 
 ### Added

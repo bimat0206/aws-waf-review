@@ -151,28 +151,99 @@ class S3Fetcher:
         """
         Parse log content from a file handle.
 
-        Args:
-            file_handle: File handle to read from
-
-        Returns:
-            List[Dict[str, Any]]: Parsed log entries
+        Supports both newline-delimited JSON (standard WAF logging) and
+        CloudWatch export files where each object spans multiple lines and
+        wraps the real payload inside an ``@message`` field.
         """
-        log_entries = []
+        content = file_handle.read()
 
-        for line in file_handle:
-            line = line.strip()
-            if not line:
-                continue
+        if not content:
+            return []
 
-            try:
-                # WAF logs are newline-delimited JSON
-                log_entry = json.loads(line)
-                log_entries.append(log_entry)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse log line: {e}")
-                continue
+        # Ensure we are working with text
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='ignore')
+
+        log_entries: List[Dict[str, Any]] = []
+        json_objects = self._extract_json_objects(content)
+
+        for obj in json_objects:
+            decoded = self._decode_log_record(obj)
+            if decoded:
+                log_entries.append(decoded)
 
         return log_entries
+
+    def _extract_json_objects(self, content: str) -> List[Any]:
+        """Extract JSON objects from a string without requiring an array wrapper."""
+        decoder = json.JSONDecoder()
+        objects: List[Any] = []
+        idx = 0
+        length = len(content)
+
+        while idx < length:
+            # Skip whitespace between objects
+            while idx < length and content[idx].isspace():
+                idx += 1
+
+            if idx >= length:
+                break
+
+            try:
+                obj, offset = decoder.raw_decode(content, idx)
+                objects.append(obj)
+                idx = offset
+            except json.JSONDecodeError:
+                # Move to the next line to resume parsing without infinite loops
+                next_idx = content.find('\n', idx)
+                if next_idx == -1:
+                    break
+                idx = next_idx + 1
+
+        return objects
+
+    def _decode_log_record(self, record: Any) -> Optional[Dict[str, Any]]:
+        """Normalize different record shapes into a WAF log dictionary."""
+        if isinstance(record, dict):
+            if '@message' in record:
+                return self._decode_cloudwatch_export_record(record)
+            return record
+
+        if isinstance(record, str):
+            try:
+                decoded = json.loads(record)
+                return decoded if isinstance(decoded, dict) else None
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse log record string: {e}")
+                return None
+
+        return None
+
+    def _decode_cloudwatch_export_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Decode CloudWatch export entries that wrap payloads in @message."""
+        message = record.get('@message')
+
+        if not isinstance(message, str):
+            logger.warning("CloudWatch export record missing '@message' string")
+            return None
+
+        try:
+            inner = json.loads(message)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to decode CloudWatch export message: {e}")
+            return None
+
+        metadata = {}
+        if record.get('@timestamp'):
+            metadata['timestamp'] = record.get('@timestamp')
+        if record.get('@ptr'):
+            metadata['ptr'] = record.get('@ptr')
+
+        if metadata:
+            inner['_cloudwatch_export_metadata'] = metadata
+
+        inner['_source'] = 'cloudwatch_export'
+        return inner
 
     def fetch_logs(self, bucket: str, prefix: str, start_time: datetime,
                   end_time: datetime) -> List[Dict[str, Any]]:

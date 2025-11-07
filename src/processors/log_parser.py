@@ -67,20 +67,35 @@ class WAFLogParser:
             Optional[Dict[str, Any]]: Parsed and normalized log entry
         """
         try:
-            # CloudWatch events have 'message' field with JSON content
-            message = event.get('message', '')
+            # CloudWatch events typically store JSON payload in 'message'.
+            # Exported logs may use '@message'. Support both to handle
+            # different acquisition paths consistently.
+            message = event.get('message') or event.get('@message') or event.get('Message')
 
             if not message:
                 logger.warning("Empty message in CloudWatch event")
                 return None
 
             # Parse the JSON message
-            log_entry = json.loads(message)
+            if isinstance(message, str):
+                log_entry = json.loads(message)
+            elif isinstance(message, dict):
+                log_entry = message
+            else:
+                logger.warning("Unsupported message type in CloudWatch event")
+                return None
 
             # Add CloudWatch metadata
             log_entry['_source'] = 'cloudwatch'
             log_entry['_event_id'] = event.get('eventId')
             log_entry['_ingestion_time'] = event.get('ingestionTime')
+
+            # Preserve export metadata if available (from S3 exports)
+            if event.get('@timestamp') or event.get('@ptr'):
+                log_entry['_cloudwatch_export_metadata'] = {
+                    'timestamp': event.get('@timestamp'),
+                    'ptr': event.get('@ptr')
+                }
 
             # Normalize the entry
             return self.normalize_log_entry(log_entry)

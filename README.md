@@ -12,6 +12,7 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 - **Comprehensive Analysis**: Analyzes WAF configurations, rules, traffic patterns, and attack types
 - **Rich Excel Reports**: Generates multi-sheet Excel workbooks with visualizations
 - **LLM-Ready**: Includes prompt templates for AI-powered security analysis
+- **Data-Rich Prompt Exports**: Automatically injects real metrics, rule data, and attack summaries into every exported prompt template for immediate AI consumption
 - **Modular Architecture**: Clean separation of concerns for easy maintenance and extension
 
 ## Architecture
@@ -714,12 +715,14 @@ The generated Excel report contains the following sheets:
 
 The `config/prompts/` directory contains markdown templates for AI-powered analysis:
 
+> **Auto-filled exports**: When you generate an Excel report, the tool now spins up `exported-prompt/{alias}_{account_id}/` with every placeholder already populated using the latest metrics, rule data, and attack summaries. You can still edit the templates manually, but most workflows can now copy/paste the enriched exports directly into your preferred LLM.
+
 ### security_effectiveness.md
 Analyzes rule effectiveness, identifies gaps, and recommends improvements.
 
 **Usage**:
-1. Open the template
-2. Replace placeholders with data from the Excel report
+1. Run the analyzer (report generation automatically exports a filled prompt under `exported-prompt/{alias}_{account_id}/`)
+2. Open the exported markdown file and review the injected JSON blocks
 3. Submit to your preferred LLM (Claude, GPT-4, etc.)
 4. Review and validate recommendations
 5. Populate the "LLM Recommendations" sheet in Excel
@@ -891,37 +894,3 @@ Contributions are welcome! Areas for improvement:
 - Automated remediation suggestions
 - Custom rule development assistance
 
-## License
-
-MIT License - See LICENSE file for details
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
-
-### Version 1.2.0 (Current)
-- Account alias/name support with `{alias}_{account_id}` naming format
-- Web ACL selection for Excel report generation
-- Critical bug fixes: DuckDB DATE() function and auto-filename generation
-
-### Version 1.1.0
-- Multi-account support with organized directory structure
-- Enhanced time window selection (today, yesterday, week, custom)
-- Auto-detect CloudWatch log groups from Web ACL configurations
-- Region-aware CloudWatch log fetching
-- Bug fixes for JSON serialization and cross-region log access
-
-### Version 1.0.0 (Initial Release)
-- Complete WAF configuration analysis
-- CloudWatch and S3 log fetching
-- Multi-sheet Excel reports with visualizations
-- LLM prompt templates for AI-powered analysis
-- DuckDB local storage
-- Comprehensive metrics calculation
-
-## Acknowledgments
-
-- AWS WAF documentation and best practices
-- OWASP Top 10 security framework
-- DuckDB for efficient local analytics
-- OpenPyXL for Excel report generation

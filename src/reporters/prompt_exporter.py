@@ -36,7 +36,7 @@ class PromptExporter:
 
     def export_all_prompts(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]],
                           resources: List[Dict[str, Any]], rules_by_web_acl: Dict[str, List[Dict[str, Any]]],
-                          export_dir: str) -> int:
+                          logging_configs: List[Dict[str, Any]], export_dir: str) -> int:
         """
         Export all prompt templates with injected WAF data.
 
@@ -45,6 +45,7 @@ class PromptExporter:
             web_acls (List[Dict[str, Any]]): Web ACL configurations
             resources (List[Dict[str, Any]]): Resource associations
             rules_by_web_acl (Dict[str, List[Dict[str, Any]]]): Rules grouped by Web ACL
+            logging_configs (List[Dict[str, Any]]): Logging configuration metadata
             export_dir (str): Directory to export prompts
 
         Returns:
@@ -56,7 +57,7 @@ class PromptExporter:
         logger.info(f"Exporting prompts to: {export_dir}")
 
         # Prepare data for injection
-        data = self._prepare_data(metrics, web_acls, resources, rules_by_web_acl)
+        data = self._prepare_data(metrics, web_acls, resources, rules_by_web_acl, logging_configs)
 
         # Export each template
         exported_count = 0
@@ -77,7 +78,8 @@ class PromptExporter:
         return exported_count
 
     def _prepare_data(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]],
-                     resources: List[Dict[str, Any]], rules_by_web_acl: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+                     resources: List[Dict[str, Any]], rules_by_web_acl: Dict[str, List[Dict[str, Any]]],
+                     logging_configs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Prepare WAF data for injection into templates.
         """
@@ -86,6 +88,18 @@ class PromptExporter:
         rule_effectiveness = metrics.get('rule_effectiveness', [])
         geo_dist = metrics.get('geographic_distribution', [])
         top_ips = metrics.get('top_blocked_ips', [])
+        action_distribution = metrics.get('action_distribution', {})
+        attack_patterns = metrics.get('attack_type_distribution', {})
+        hourly_patterns = metrics.get('hourly_patterns', [])
+        bot_analysis = metrics.get('bot_analysis', {})
+
+        def to_json(value: Any) -> str:
+            if value in (None, '', [], {}):
+                return "null"
+            try:
+                return json.dumps(value, indent=2, default=str, ensure_ascii=False)
+            except TypeError:
+                return json.dumps(str(value), indent=2, ensure_ascii=False)
 
         # Format Web ACLs info
         web_acls_summary = []
@@ -115,6 +129,30 @@ class PromptExporter:
                 'arn': resource.get('resource_arn', '')
             })
 
+        total_capacity = sum((acl.get('capacity') or 0) for acl in web_acls)
+        total_rules = sum(len(rules) for rules in rules_by_web_acl.values())
+        managed_rule_groups = [
+            rule.get('name') or rule.get('rule_id')
+            for rules in rules_by_web_acl.values()
+            for rule in rules
+            if 'MANAGED' in str(rule.get('rule_type', '')).upper()
+        ]
+
+        logging_summary = [{
+            'web_acl_id': cfg.get('web_acl_id'),
+            'destination': cfg.get('destination_arn'),
+            'type': cfg.get('destination_type'),
+            'sampling_rate': cfg.get('sampling_rate')
+        } for cfg in logging_configs]
+
+        suggested_order = sorted(rule_effectiveness, key=lambda r: r.get('hit_count', 0), reverse=True)
+        optimized_order = [{
+            'rule': rule.get('rule_name') or rule.get('rule_id'),
+            'suggested_priority': idx + 1,
+            'hit_count': rule.get('hit_count', 0),
+            'block_rate_percent': rule.get('block_rate_percent', 0)
+        } for idx, rule in enumerate(suggested_order[:10])]
+
         # Prepare formatted data
         data = {
             'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -136,7 +174,39 @@ class PromptExporter:
             'top_countries': [{'country': g.get('country', ''), 'requests': g.get('total_requests', 0),
                               'threat_score': f"{g.get('threat_score', 0):.1f}%"} for g in geo_dist[:10]],
             'top_blocked_ips': [{'ip': ip.get('ip', ''), 'country': ip.get('country', ''),
-                                'blocks': ip.get('block_count', 0)} for ip in top_ips[:20]]
+                                'blocks': ip.get('block_count', 0)} for ip in top_ips[:20]],
+            'current_rules': to_json(rules_by_web_acl),
+            'rule_performance': to_json(rule_effectiveness),
+            'traffic_distribution': to_json(geo_dist),
+            'cost_metrics': to_json({
+                'total_rules': total_rules,
+                'estimated_capacity_wcu': total_capacity,
+                'managed_rule_groups': managed_rule_groups,
+                'logging_enabled_web_acls': len(logging_summary)
+            }),
+            'attack_patterns': to_json(attack_patterns),
+            'rule_metrics': to_json(rule_effectiveness),
+            'top_blocked_requests': to_json(top_ips),
+            'geo_distribution': to_json(geo_dist),
+            'waf_config': to_json(web_acls),
+            'logging_config': to_json(logging_summary),
+            'protected_resources': to_json(resources),
+            'rule_coverage': to_json(coverage),
+            'incident_history': to_json(hourly_patterns),
+            'blocked_patterns': to_json(attack_patterns or action_distribution),
+            'legitimate_traffic_baseline': to_json({
+                'allowed_requests': summary.get('allowed_requests', summary.get('actions', {}).get('ALLOW', 0)),
+                'time_range': summary.get('time_range'),
+                'action_distribution': action_distribution
+            }),
+            'rule_block_analysis': to_json(rule_effectiveness),
+            'client_patterns': to_json({
+                'top_ips': top_ips[:10],
+                'geographies': geo_dist[:10],
+                'bot_signals': bot_analysis
+            }),
+            'current_config': to_json(rules_by_web_acl),
+            'optimized_config': to_json({'suggested_order': optimized_order})
         }
 
         return data
@@ -212,6 +282,21 @@ class PromptExporter:
         if '{{top_blocked_ips}}' in filled:
             ips_text = self._format_top_ips(data['top_blocked_ips'])
             filled = filled.replace('{{top_blocked_ips}}', ips_text)
+
+        # Replace single-brace placeholders used by legacy templates
+        structured_keys = [
+            'current_rules', 'rule_performance', 'traffic_distribution', 'cost_metrics',
+            'attack_patterns', 'rule_metrics', 'top_blocked_requests', 'geo_distribution',
+            'waf_config', 'logging_config', 'protected_resources', 'rule_coverage',
+            'incident_history', 'blocked_patterns', 'legitimate_traffic_baseline',
+            'rule_block_analysis', 'client_patterns', 'current_config', 'optimized_config'
+        ]
+
+        for key in structured_keys:
+            placeholder = f'{{{key}}}'
+            if placeholder in filled:
+                value = data.get(key, 'null')
+                filled = filled.replace(placeholder, value)
 
         return filled
 

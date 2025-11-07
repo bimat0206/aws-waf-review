@@ -13,7 +13,10 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
-import coloredlogs
+try:
+    import coloredlogs
+except ImportError:  # pragma: no cover - optional dependency
+    coloredlogs = None
 
 from storage.duckdb_manager import DuckDBManager
 from fetchers.cloudwatch_fetcher import CloudWatchFetcher
@@ -40,26 +43,38 @@ from utils.time_helpers import (
 
 # Setup logging
 logger = logging.getLogger(__name__)
-coloredlogs.install(
-    level='INFO',
-    fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+if coloredlogs:
+    coloredlogs.install(
+        level='INFO',
+        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger.warning("coloredlogs not installed; falling back to basic logging formatting")
 
 
-def get_account_identifier(account_id: str, account_alias: Optional[str] = None) -> str:
+def get_account_identifier(account_id: Optional[str], account_alias: Optional[str] = None) -> str:
     """
     Generate account identifier for directory and file naming.
 
     Args:
-        account_id (str): AWS Account ID
+        account_id (Optional[str]): AWS Account ID
         account_alias (Optional[str]): AWS Account alias/name
 
     Returns:
-        str: Account identifier in format "{alias}_{account_id}" or "{account_id}"
+        str: Account identifier in format "{alias}_{account_id}", "{account_id}",
+             or "default" when account metadata is unavailable
     """
-    if account_alias:
+    if account_alias and account_id:
         return f"{account_alias}_{account_id}"
-    return account_id
+    if account_alias:
+        return account_alias
+    if account_id:
+        return account_id
+    return 'default'
 
 
 def setup_directories(account_id: str = None, account_alias: str = None):
@@ -478,17 +493,22 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
 
     # Export LLM prompts with injected data
     try:
-        # Determine export directory based on account
-        session_info = get_session_info()
-        account_id = session_info.get('account_id')
-        account_alias = session_info.get('account_alias')
+        # Determine export directory based on account (fallbacks to 'default' offline)
+        session_info = {}
+        try:
+            session_info = get_session_info()
+        except Exception as session_error:
+            logger.warning(f"Could not retrieve AWS session info for prompt export: {session_error}")
+
+        account_id = session_info.get('account_id') if session_info else None
+        account_alias = session_info.get('account_alias') if session_info else None
         account_identifier = get_account_identifier(account_id, account_alias)
 
         prompt_export_dir = f"exported-prompt/{account_identifier}"
 
         exporter = PromptExporter()
         prompt_count = exporter.export_all_prompts(
-            metrics, web_acls_list, resources_list, rules_by_web_acl, prompt_export_dir
+            metrics, web_acls_list, resources_list, rules_by_web_acl, logging_configs_list, prompt_export_dir
         )
         logger.info(f"Exported {prompt_count} LLM prompts to: {prompt_export_dir}")
     except Exception as e:
@@ -689,8 +709,8 @@ def main():
     # Setup account-specific directories
     dir_paths = setup_directories(account_id, account_alias)
 
-    # Update database path if using default
-    if args.db_path == 'data/waf_analysis.duckdb':
+    # Update database path if using default and we have a real account ID
+    if args.db_path == 'data/waf_analysis.duckdb' and account_id:
         args.db_path = f"{dir_paths['data']}/{account_identifier}_waf_analysis.duckdb"
         logger.info(f"Using account-specific database: {args.db_path}")
 

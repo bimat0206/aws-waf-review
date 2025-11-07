@@ -2,6 +2,17 @@
 
 All notable changes to the reporters module will be documented in this file.
 
+## [1.1.1] - 2025-11-07
+
+### Added
+
+- **Prompt Exporter JSON Injection**: Prompt exports now include serialized rule inventories, traffic distributions, attack patterns, and compliance data directly inside the markdown templates.
+
+### Changed
+
+- **Prompt Export API**: `PromptExporter.export_all_prompts()` accepts logging configuration metadata so compliance prompts can describe destinations without manual edits.
+- **Structured Placeholders**: Single-brace placeholders like `{current_rules}` and `{rule_metrics}` are automatically replaced during export, keeping all templates synchronized with the latest WAF metrics.
+
 ## [1.0.0] - 2025-11-07
 
 ### Added

@@ -1,0 +1,24 @@
+{
+    "aws_profiles": [
+        {
+            "profileName": "manh-acfc",
+            "region_name": "us-east-1",
+            "scope": "CLOUDFRONT"
+        }
+    ],
+    "log_retrieval": {
+        "max_concurrent_downloads": 4,
+        "retry_attempts": 3,
+        "retry_delay_seconds": 5
+    },
+    "storage": {
+        "base_directory": "./logs/raw",
+        "retention_days": 30,
+        "compression_enabled": true,
+        "compression_level": 6
+    },
+    "logging": {
+        "log_file": "./logs/app/waf-logger.log",
+        "log_level": "info"
+    }
+}
