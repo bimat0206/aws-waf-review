@@ -2,6 +2,45 @@
 
 All notable changes to the processors module will be documented in this file.
 
+## [1.0.2] - 2025-11-07
+
+### Fixed
+
+#### Log Parser (`log_parser.py`)
+- **CRITICAL BUG FIX**: Support for `@message` field in CloudWatch log events
+  - **Root Cause**: CloudWatch Logs uses different field names depending on the source:
+    - `@message` - Used in CloudWatch Insights queries and log exports
+    - `message` - Used in standard API responses
+    - `Message` - Sometimes used in different CloudWatch contexts
+  - **Impact**: Raw logs, Excel reports, and LLM prompts were empty because only `message` field was checked
+  - **Fix**: Modified `parse_cloudwatch_event()` to check all three field name variants (line 73)
+  - **Implementation**: `message = event.get('message') or event.get('@message') or event.get('Message')`
+  - **Additional Improvements**:
+    - Added support for dict-type messages (not just strings)
+    - Preserves CloudWatch export metadata (`@timestamp`, `@ptr`)
+    - Enhanced debug logging for empty events
+  - **Backward Compatibility**: Maintains support for all field naming conventions
+
+**Before (Broken)**:
+```python
+message = event.get('message', '')  # Only checked 'message'
+```
+
+**After (Fixed)**:
+```python
+message = event.get('message') or event.get('@message') or event.get('Message')
+if isinstance(message, str):
+    log_entry = json.loads(message)
+elif isinstance(message, dict):
+    log_entry = message
+```
+
+**Impact**:
+- ✅ WAF logs are now properly extracted from CloudWatch
+- ✅ Excel reports populate with actual log data
+- ✅ LLM prompts contain complete information
+- ✅ All metrics and analytics work correctly
+
 ## [1.0.1] - 2025-11-07
 
 ### Fixed
