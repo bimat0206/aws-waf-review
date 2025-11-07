@@ -2,6 +2,33 @@
 
 All notable changes to the storage module will be documented in this file.
 
+## [1.0.2] - 2025-11-07
+
+### Fixed
+
+#### DuckDB Manager (`duckdb_manager.py`)
+- **CRITICAL BUG FIX**: Removed primary key and composite key columns from ON CONFLICT UPDATE SET
+  - Error: "Binder Error: Can not assign to column 'web_acl_id' because it has a UNIQUE/PRIMARY KEY constraint"
+  - Cannot update columns that are part of the primary key or composite identifier in ON CONFLICT clause
+  - Fixed in 3 methods:
+    - `insert_rules()` - Removed `web_acl_id` from UPDATE SET (embedded in rule_id)
+    - `insert_resource_association()` - Removed `web_acl_id` and `resource_arn` from UPDATE SET (embedded in association_id)
+    - `insert_logging_configuration()` - Removed `web_acl_id` and `destination_type` from UPDATE SET (embedded in config_id)
+
+**Impact**: Without this fix, inserting rules/resources/logging configs would fail with BinderException on any update attempt.
+
+**Root Cause**: In DuckDB's ON CONFLICT clause, you cannot update columns that are:
+1. Primary keys
+2. Part of the composite identifier used to construct the primary key
+3. Foreign keys that are embedded in the primary key
+
+Since these IDs are composite:
+- `rule_id = f"{web_acl_id}_{rule_name}"` → cannot update web_acl_id
+- `association_id = f"{web_acl_id}_{resource_arn}"` → cannot update web_acl_id or resource_arn
+- `config_id = f"{web_acl_id}_{dest_type}"` → cannot update web_acl_id or destination_type
+
+**Solution**: Only update mutable columns that are NOT part of the primary key or composite identifier.
+
 ## [1.0.1] - 2025-11-07
 
 ### Fixed

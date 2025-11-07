@@ -242,7 +242,6 @@ class DuckDBManager:
                     action, visibility_config, statement, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (rule_id) DO UPDATE SET
-                    web_acl_id = EXCLUDED.web_acl_id,
                     name = EXCLUDED.name,
                     priority = EXCLUDED.priority,
                     rule_type = EXCLUDED.rule_type,
@@ -283,8 +282,6 @@ class DuckDBManager:
                 association_id, web_acl_id, resource_arn, resource_type, created_at
             ) VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (association_id) DO UPDATE SET
-                web_acl_id = EXCLUDED.web_acl_id,
-                resource_arn = EXCLUDED.resource_arn,
                 resource_type = EXCLUDED.resource_type,
                 created_at = EXCLUDED.created_at
         """, [association_id, web_acl_id, resource_arn, resource_type, datetime.utcnow()])
@@ -322,8 +319,6 @@ class DuckDBManager:
                     log_format, sampling_rate, redacted_fields, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (config_id) DO UPDATE SET
-                    web_acl_id = EXCLUDED.web_acl_id,
-                    destination_type = EXCLUDED.destination_type,
                     destination_arn = EXCLUDED.destination_arn,
                     log_format = EXCLUDED.log_format,
                     sampling_rate = EXCLUDED.sampling_rate,
