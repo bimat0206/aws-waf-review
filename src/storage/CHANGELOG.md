@@ -2,6 +2,38 @@
 
 All notable changes to the storage module will be documented in this file.
 
+## [1.0.1] - 2025-11-07
+
+### Fixed
+
+#### DuckDB Manager (`duckdb_manager.py`)
+- **CRITICAL BUG FIX**: Replace `INSERT OR REPLACE` with `ON CONFLICT` syntax
+  - DuckDB requires explicit conflict resolution when tables have PRIMARY KEY constraints
+  - Error: "Binder Error: Conflict target has to be provided for a DO UPDATE operation when the table has multiple UNIQUE/PRIMARY KEY constraints"
+  - Fixed in 4 methods:
+    - `insert_web_acl()` - Now uses `ON CONFLICT (web_acl_id) DO UPDATE SET`
+    - `insert_rules()` - Now uses `ON CONFLICT (rule_id) DO UPDATE SET`
+    - `insert_resource_association()` - Now uses `ON CONFLICT (association_id) DO UPDATE SET`
+    - `insert_logging_configuration()` - Now uses `ON CONFLICT (config_id) DO UPDATE SET`
+
+**Impact**: Without this fix, re-running fetches or updating existing Web ACLs would fail with a BinderException.
+
+**Root Cause**: The `INSERT OR REPLACE` syntax is ambiguous in DuckDB when there are constraints. DuckDB requires the standard SQL `ON CONFLICT (column) DO UPDATE SET` syntax to explicitly specify which constraint to check.
+
+**Solution**: Replaced all `INSERT OR REPLACE` statements with proper `INSERT ... ON CONFLICT (primary_key) DO UPDATE SET` syntax, explicitly listing all columns to update when a conflict occurs.
+
+**SQL Pattern**:
+```sql
+-- Before:
+INSERT OR REPLACE INTO table (col1, col2) VALUES (?, ?)
+
+-- After:
+INSERT INTO table (col1, col2) VALUES (?, ?)
+ON CONFLICT (primary_key) DO UPDATE SET
+    col1 = EXCLUDED.col1,
+    col2 = EXCLUDED.col2
+```
+
 ## [1.0.0] - 2025-11-07
 
 ### Added
