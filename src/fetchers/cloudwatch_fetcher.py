@@ -276,7 +276,8 @@ class CloudWatchFetcher:
                 }
 
             # Calculate average event size
-            total_bytes = sum(len(event.get('message', '')) for event in sample_events)
+            # Support both '@message' and 'message' field names
+            total_bytes = sum(len(event.get('@message') or event.get('message', '')) for event in sample_events)
             avg_event_size = total_bytes / len(sample_events) if sample_events else 0
 
             # Get log streams to estimate total volume

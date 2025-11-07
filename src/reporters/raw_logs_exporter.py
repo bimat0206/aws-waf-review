@@ -96,7 +96,8 @@ class RawLogsExporter:
             # Parse the log message to extract Web ACL info
             try:
                 # The message field contains the actual WAF log JSON
-                message = event.get('message', '{}')
+                # CloudWatch can use '@message' or 'message' field
+                message = event.get('@message') or event.get('message', '{}')
                 if isinstance(message, str):
                     log_data = json.loads(message)
                 else:

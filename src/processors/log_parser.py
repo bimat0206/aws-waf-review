@@ -74,6 +74,7 @@ class WAFLogParser:
 
             if not message:
                 logger.warning("Empty message in CloudWatch event")
+                logger.debug(f"Event keys: {list(event.keys())}")
                 return None
 
             # Parse the JSON message
