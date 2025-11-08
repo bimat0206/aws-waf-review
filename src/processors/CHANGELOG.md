@@ -205,6 +205,17 @@ elif isinstance(message, dict):
 - Geographic data depends on WAF's geo-detection accuracy
 - JA3/JA4 fingerprints may not be present in all logs
 
+## [1.0.4] - 2025-11-08
+
+### Fixed
+- **Log Parser (`log_parser.py`)**: Fixed Web ACL ID extraction from ARN format to ensure proper table joins. The logs contain full ARNs in the `webaclId` field, but the database stores only the ID portion. The normalize function now extracts just the ID from the ARN for proper matching.
+
+## [1.0.3] - 2025-11-08
+
+### Changed
+- **Metrics Calculator (`metrics_calculator.py`)**: Reduced database round trips by fetching total requests in a single query instead of calling expensive functions multiple times
+- **Log Parser (`log_parser.py`)**: Optimized normalize_log_entry function to efficiently find user-agent header without unnecessary iterations, improved batch parsing with pre-determined parse methods to avoid repeated conditional checks, and enhanced efficiency of timestamp handling and field extraction
+
 ### Future Enhancements
 - [ ] ML-based attack classification
 - [ ] Anomaly detection algorithms

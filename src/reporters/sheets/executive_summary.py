@@ -2,8 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
-from openpyxl.drawing.image import Image as XLImage
+from typing import Any, Dict, List, Optional
 from openpyxl.styles import Alignment, Font
 from .base_sheet import BaseSheet
 
@@ -17,9 +16,22 @@ class ExecutiveSummarySheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]]) -> None:
+    def build(self, metrics: Dict[str, Any], web_acls: List[Dict[str, Any]], account_info: Optional[Dict[str, Any]] = None) -> None:
         """
-        Create the Executive Summary sheet with Web ACL information.
+        Create the Executive Summary sheet with Web ACL and AWS account information.
+
+        This sheet provides a high-level overview of the AWS WAF security posture, including:
+        - AWS account details (ID, name, region, profile)
+        - Web ACL configurations and settings
+        - Key security metrics (total requests, block rate, unique IPs, etc.)
+        - Analysis time period
+        - Overall security posture score
+        - Visual distribution of WAF actions
+
+        Args:
+            metrics: Calculated metrics data
+            web_acls: List of Web ACL configurations
+            account_info: AWS account information (account_id, account_alias, region, profile)
         """
         logger.info("Creating Executive Summary sheet...")
 
@@ -38,6 +50,42 @@ class ExecutiveSummarySheet(BaseSheet):
         ws.merge_cells('A2:D2')
 
         row = 4
+
+        # AWS Account Information Section
+        if account_info:
+            ws[f'A{row}'] = 'AWS Account Information'
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:D{row}')
+            row += 1
+
+            account_details = []
+            if account_info.get('account_id'):
+                account_details.append(('Account ID', account_info['account_id']))
+            if account_info.get('account_alias'):
+                account_details.append(('Account Name', account_info['account_alias']))
+            if account_info.get('region'):
+                account_details.append(('Region', account_info['region']))
+            if account_info.get('profile'):
+                account_details.append(('AWS Profile', account_info['profile']))
+            if account_info.get('timezone'):
+                account_details.append(('Timezone', account_info['timezone']))
+
+            for idx, (label, value) in enumerate(account_details):
+                highlight = idx % 2 == 0
+                ws[f'A{row}'] = label
+                ws[f'A{row}'].font = Font(bold=True, size=10, name='Calibri')
+                ws[f'A{row}'].border = self.thin_border
+                if highlight:
+                    ws[f'A{row}'].fill = self.highlight_fill
+
+                ws[f'B{row}'] = value
+                ws[f'B{row}'].font = Font(bold=True, size=10, color='1F4E78', name='Calibri')
+                ws[f'B{row}'].border = self.thin_border
+                if highlight:
+                    ws[f'B{row}'].fill = self.highlight_fill
+                row += 1
+
+            row += 1
 
         # Web ACLs Summary Section
         ws[f'A{row}'] = 'Web ACLs Overview'
@@ -170,19 +218,6 @@ class ExecutiveSummarySheet(BaseSheet):
                 ws[f'B{row}'].font = Font(bold=True, size=14, color='FF0000', name='Calibri')  # Red
                 ws[f'B{row}'].fill = self.danger_fill
             row += 1
-
-        # Action distribution chart
-        row += 2
-        action_dist = metrics.get('action_distribution', {})
-        if action_dist:
-            try:
-                chart_buffer = self.viz.create_action_distribution_chart(action_dist)
-                img = XLImage(chart_buffer)
-                img.width = 600
-                img.height = 400
-                ws.add_image(img, f'A{row}')
-            except Exception as e:
-                logger.warning(f"Could not create action distribution chart: {e}")
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 30

@@ -801,18 +801,7 @@ The tool uses DuckDB with the following tables:
 - **logging_configurations**: Logging destinations and settings
 - **waf_logs**: Parsed WAF log entries with full metadata
 
-You can query the database directly:
 
-```bash
-duckdb waf_analysis.duckdb
-```
-
-```sql
--- Example queries
-SELECT COUNT(*) FROM waf_logs WHERE action = 'BLOCK';
-SELECT country, COUNT(*) as requests FROM waf_logs GROUP BY country ORDER BY requests DESC;
-SELECT terminating_rule_id, COUNT(*) as hits FROM waf_logs GROUP BY terminating_rule_id ORDER BY hits DESC LIMIT 10;
-```
 
 ## Security Metrics Calculated
 

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 from openpyxl.drawing.image import Image as XLImage
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill
 from .base_sheet import BaseSheet
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,23 @@ class GeographicBlockedTrafficSheet(BaseSheet):
     def build(self, metrics: Dict[str, Any]) -> None:
         """
         Create the Geographic Distribution of Blocked Traffic sheet.
-        Focuses on blocked traffic by geography to identify malicious sources.
+
+        This sheet focuses exclusively on blocked traffic by geographic location, including:
+        - Countries with the highest volume of blocked requests
+        - Block rates by country
+        - Threat level assessments based on block patterns
+        - Risk assessments for each region
+        - Visual geographic threat heatmap
+
+        Metrics explained:
+        - Blocked Requests: Total requests blocked from this country
+        - Total Requests: All requests from this country (blocked + allowed)
+        - Block Rate %: Percentage of requests blocked
+        - Threat Level: Assessment based on volume and block rate
+          - CRITICAL: >75% block rate with >100 blocked requests
+          - HIGH: >50% block rate with >50 blocked requests
+          - MEDIUM: >25% block rate or >100 blocked requests
+          - LOW: Below medium thresholds
         """
         logger.info("Creating Geographic Distribution of Blocked Traffic sheet...")
 
@@ -151,23 +167,22 @@ class GeographicBlockedTrafficSheet(BaseSheet):
 
                 row += 1
 
-            # Add visualization if available
-            row += 2
-            try:
-                # Use the geographic chart if it exists
-                if geo_data:
-                    chart_buffer = self.viz.create_geographic_threat_chart(geo_data)
-                    img = XLImage(chart_buffer)
-                    img.width = 800
-                    img.height = 500
-                    ws.add_image(img, f'A{row}')
-            except Exception as e:
-                logger.warning(f"Could not create geographic chart: {e}")
-
         else:
             ws[f'A{row}'] = 'No geographic data available for blocked traffic analysis'
             ws[f'A{row}'].font = Font(italic=True, color='808080', name='Calibri')
             ws.merge_cells(f'A{row}:F{row}')
+
+        # Add visualization on the right side
+        if geo_data:
+            try:
+                chart_buffer = self.viz.create_geographic_threat_chart(geo_data)
+                img = XLImage(chart_buffer)
+                img.width = 700
+                img.height = 450
+                # Place chart starting at column H (right side of the data table)
+                ws.add_image(img, 'H5')
+            except Exception as e:
+                logger.warning(f"Could not create geographic chart: {e}")
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 20
@@ -176,3 +191,8 @@ class GeographicBlockedTrafficSheet(BaseSheet):
         ws.column_dimensions['D'].width = 15
         ws.column_dimensions['E'].width = 15
         ws.column_dimensions['F'].width = 50
+        ws.column_dimensions['G'].width = 2  # Gap
+        ws.column_dimensions['H'].width = 2
+        ws.column_dimensions['I'].width = 2
+        ws.column_dimensions['J'].width = 2
+        ws.column_dimensions['K'].width = 2

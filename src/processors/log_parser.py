@@ -141,7 +141,7 @@ class WAFLogParser:
         """
         normalized = {}
 
-        # Parse timestamp
+        # Parse timestamp efficiently
         timestamp = log_entry.get('timestamp')
         if timestamp:
             if isinstance(timestamp, int):
@@ -163,7 +163,14 @@ class WAFLogParser:
             normalized['action'] = action or 'UNKNOWN'
 
         # Extract Web ACL information
-        normalized['webaclId'] = log_entry.get('webaclId') or log_entry.get('webAclId')
+        webacl_id_full = log_entry.get('webaclId') or log_entry.get('webAclId')
+        # Extract just the Web ACL ID from the full ARN if it's in ARN format
+        if webacl_id_full and webacl_id_full.startswith('arn:aws:wafv2:'):
+            # Extract ID from ARN format: arn:aws:wafv2:region:account:global/webacl/name/id
+            normalized['webaclId'] = webacl_id_full.split('/')[-1] if '/' in webacl_id_full else webacl_id_full
+        else:
+            normalized['webaclId'] = webacl_id_full
+        
         normalized['webaclName'] = log_entry.get('webaclName') or log_entry.get('webAclName')
 
         # Extract HTTP request information
@@ -180,11 +187,14 @@ class WAFLogParser:
         normalized['httpRequest'] = http_request
         normalized['requestHeaders'] = headers
 
-        # Find User-Agent header
-        for header in headers:
-            if header.get('name', '').lower() == 'user-agent':
-                normalized['userAgent'] = header.get('value')
-                break
+        # Find User-Agent header efficiently
+        user_agent = None
+        if headers:  # Only search if headers exist
+            for header in headers:
+                if header.get('name', '').lower() == 'user-agent':
+                    user_agent = header.get('value')
+                    break
+        normalized['userAgent'] = user_agent
 
         # Extract HTTP status
         normalized['httpStatus'] = log_entry.get('httpStatus')
@@ -236,14 +246,17 @@ class WAFLogParser:
         parsed_entries = []
         errors = 0
 
+        # Choose parsing method based on source
+        if source == 'cloudwatch':
+            parse_method = self.parse_cloudwatch_event
+        elif source == 's3':
+            parse_method = self.parse_s3_log_entry
+        else:
+            parse_method = self.normalize_log_entry
+
         for entry in log_entries:
             try:
-                if source == 'cloudwatch':
-                    parsed = self.parse_cloudwatch_event(entry)
-                elif source == 's3':
-                    parsed = self.parse_s3_log_entry(entry)
-                else:
-                    parsed = self.normalize_log_entry(entry)
+                parsed = parse_method(entry)
 
                 if parsed:
                     parsed_entries.append(parsed)

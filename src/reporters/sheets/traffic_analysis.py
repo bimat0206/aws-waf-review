@@ -20,6 +20,18 @@ class TrafficAnalysisSheet(BaseSheet):
     def build(self, metrics: Dict[str, Any]) -> None:
         """
         Create the Traffic Analysis sheet.
+
+        This sheet analyzes traffic patterns and geographic distribution, including:
+        - Daily traffic trends over time (requests, blocks, allows)
+        - Geographic distribution of traffic by country
+        - Threat scores by geographic location
+        - Visual charts showing traffic patterns and trends
+
+        Metrics explained:
+        - Total Requests: Number of requests from each country
+        - Blocked: Requests blocked by WAF rules
+        - Allowed: Requests allowed through WAF
+        - Threat Score: Percentage of requests blocked (higher = more threats)
         """
         logger.info("Creating Traffic Analysis sheet...")
 
@@ -37,20 +49,22 @@ class TrafficAnalysisSheet(BaseSheet):
         ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
         ws.merge_cells('A2:E2')
 
-        row = 4
+        # Description
+        ws['A3'] = 'Analyzes traffic patterns over time and geographic distribution to identify trends, peak periods, and regional threat sources.'
+        ws['A3'].font = Font(size=10, italic=True, color='606060', name='Calibri')
+        ws['A3'].alignment = Alignment(wrap_text=True)
+        ws.merge_cells('A3:E3')
+        ws.row_dimensions[3].height = 30
 
-        # Daily trends chart
+        row = 5
+
+        # Daily trends chart - will be placed on the right side later
+        daily_chart_start_row = row
         daily_data = metrics.get('daily_trends')
+        has_daily_chart = False
+
         if daily_data is not None and not daily_data.empty:
-            try:
-                chart_buffer = self.viz.create_daily_traffic_chart(daily_data)
-                img = XLImage(chart_buffer)
-                img.width = 800
-                img.height = 400
-                ws.add_image(img, f'A{row}')
-                row += 25
-            except Exception as e:
-                logger.warning(f"Could not create daily traffic chart: {e}")
+            has_daily_chart = True
 
         # Geographic distribution
         geo_data = metrics.get('geographic_distribution', [])
@@ -92,17 +106,48 @@ class TrafficAnalysisSheet(BaseSheet):
 
                 row += 1
 
-            # Add geographic chart
+        else:
+            ws[f'A{row}'] = 'Geographic Distribution'
+            ws[f'A{row}'].font = self.subtitle_font
+            ws.merge_cells(f'A{row}:E{row}')
+            row += 1
+            ws[f'A{row}'] = 'No geographic data available.'
+            ws[f'A{row}'].font = Font(italic=True, color='808080', name='Calibri')
+            ws.merge_cells(f'A{row}:E{row}')
             row += 2
+
+        # Add charts on the right side
+        chart_col = 'G'  # Start charts at column G (right side)
+
+        # Daily traffic chart
+        if has_daily_chart:
+            try:
+                chart_buffer = self.viz.create_daily_traffic_chart(daily_data)
+                img = XLImage(chart_buffer)
+                img.width = 700
+                img.height = 350
+                ws.add_image(img, f'{chart_col}{daily_chart_start_row}')
+            except Exception as e:
+                logger.warning(f"Could not create daily traffic chart: {e}")
+
+        # Geographic chart (if available)
+        if geo_data:
             try:
                 chart_buffer = self.viz.create_geographic_threat_chart(geo_data)
                 img = XLImage(chart_buffer)
-                img.width = 800
-                img.height = 500
-                ws.add_image(img, f'A{row}')
+                img.width = 700
+                img.height = 400
+                # Position below daily chart (approximately 23 rows down)
+                chart_row = daily_chart_start_row + 23 if has_daily_chart else daily_chart_start_row
+                ws.add_image(img, f'{chart_col}{chart_row}')
             except Exception as e:
                 logger.warning(f"Could not create geographic chart: {e}")
 
         # Auto-adjust columns
         for col in ['A', 'B', 'C', 'D', 'E']:
             ws.column_dimensions[col].width = 18
+        ws.column_dimensions['F'].width = 2  # Gap
+        ws.column_dimensions['G'].width = 2
+        ws.column_dimensions['H'].width = 2
+        ws.column_dimensions['I'].width = 2
+        ws.column_dimensions['J'].width = 2

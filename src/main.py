@@ -13,7 +13,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 try:
     import coloredlogs
 except ImportError:  # pragma: no cover - optional dependency
@@ -43,6 +43,9 @@ from utils.time_helpers import (
     get_custom_window
 )
 
+# Global timezone configuration (default: UTC+7)
+TIMEZONE_OFFSET = '+07:00'  # Default timezone
+
 # Setup logging
 logger = logging.getLogger(__name__)
 if coloredlogs:
@@ -56,6 +59,48 @@ else:
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     logger.warning("coloredlogs not installed; falling back to basic logging formatting")
+
+
+def get_timezone() -> str:
+    """
+    Get the current timezone offset.
+
+    Returns:
+        str: Timezone offset (e.g., '+07:00', '+00:00', '-05:00')
+    """
+    return TIMEZONE_OFFSET
+
+
+def set_timezone(offset: str) -> None:
+    """
+    Set the timezone offset for report generation.
+
+    Args:
+        offset (str): Timezone offset (e.g., '+07:00', '+00:00', '-05:00')
+    """
+    global TIMEZONE_OFFSET
+    TIMEZONE_OFFSET = offset
+    logger.info(f"Timezone set to UTC{offset}")
+
+
+def get_timezone_display() -> str:
+    """
+    Get display-friendly timezone name.
+
+    Returns:
+        str: Timezone display name (e.g., 'UTC+7', 'UTC', 'UTC-5')
+    """
+    offset = TIMEZONE_OFFSET
+    if offset == '+00:00':
+        return 'UTC'
+    elif offset.startswith('+'):
+        # Remove leading '+' and trailing ':00' for display
+        hours = offset[1:].split(':')[0].lstrip('0') or '0'
+        return f'UTC+{hours}'
+    else:
+        # Negative offset
+        hours = offset[1:].split(':')[0].lstrip('0') or '0'
+        return f'UTC-{hours}'
 
 
 def get_account_identifier(account_id: Optional[str], account_alias: Optional[str] = None) -> str:
@@ -505,7 +550,7 @@ def fetch_logs_from_s3(db_manager: DuckDBManager, bucket: str, prefix: str,
     logger.info(f"Successfully stored {len(parsed_logs)} log entries")
 
 
-def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_web_acl_ids: Optional[List[str]] = None):
+def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_web_acl_ids: Optional[List[str]] = None, account_info: Optional[Dict[str, Any]] = None):
     """
     Generate Excel report with visualizations.
 
@@ -513,6 +558,7 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
         db_manager (DuckDBManager): Database manager instance
         output_path (str): Path to save Excel report
         selected_web_acl_ids (Optional[List[str]]): List of Web ACL IDs to include in report. If None, includes all.
+        account_info (Optional[Dict[str, Any]]): AWS account information (account_id, account_alias, region, profile)
     """
     if selected_web_acl_ids:
         logger.info(f"Generating Excel report for {len(selected_web_acl_ids)} Web ACL(s)...")
@@ -569,7 +615,7 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
 
     # Generate Excel report
     generator = ExcelReportGenerator(output_path)
-    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list, rules_by_web_acl)
+    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list, rules_by_web_acl, account_info)
 
     logger.info(f"Excel report generated: {output_path}")
 
@@ -615,11 +661,75 @@ def interactive_menu(db_manager: DuckDBManager):
     print("3. View Current Inventory (Web ACLs and Resources)")
     print("4. Generate Excel Report")
     print("5. View Database Statistics")
+    print("6. Configure Timezone Settings")
     print("0. Exit")
     print("="*80)
+    print(f"Current Timezone: {get_timezone_display()}")
+    print("="*80)
 
-    choice = input("\nEnter your choice (0-5): ").strip()
+    choice = input("\nEnter your choice (0-6): ").strip()
     return choice
+
+
+def configure_timezone():
+    """
+    Interactive timezone configuration.
+    """
+    print("\n" + "="*80)
+    print("⏰ Timezone Configuration")
+    print("="*80)
+    print(f"Current Timezone: {get_timezone_display()}")
+    print("\nSelect a timezone option:")
+    print("1. UTC (GMT+0)")
+    print("2. UTC+7 (Bangkok, Jakarta, Ho Chi Minh)")
+    print("3. UTC+8 (Singapore, Hong Kong, Beijing)")
+    print("4. UTC+9 (Tokyo, Seoul)")
+    print("5. UTC-5 (US Eastern)")
+    print("6. UTC-8 (US Pacific)")
+    print("7. Custom timezone")
+    print("0. Cancel")
+    print("="*80)
+
+    choice = input("\nEnter your choice (0-7): ").strip()
+
+    timezone_map = {
+        '1': '+00:00',
+        '2': '+07:00',
+        '3': '+08:00',
+        '4': '+09:00',
+        '5': '-05:00',
+        '6': '-08:00',
+    }
+
+    if choice == '0':
+        print("❌ Timezone configuration cancelled")
+        return
+    elif choice in timezone_map:
+        offset = timezone_map[choice]
+        set_timezone(offset)
+        print(f"✓ Timezone updated to {get_timezone_display()}")
+    elif choice == '7':
+        print("\nEnter custom timezone offset:")
+        print("Format: +HH:MM or -HH:MM")
+        print("Examples: +05:30 (India), -03:00 (Brazil), +10:00 (Australia East)")
+        custom_offset = input("Offset: ").strip()
+
+        # Validate format
+        if len(custom_offset) == 6 and custom_offset[0] in ['+', '-'] and custom_offset[3] == ':':
+            try:
+                hours = int(custom_offset[1:3])
+                minutes = int(custom_offset[4:6])
+                if 0 <= hours <= 14 and 0 <= minutes <= 59:
+                    set_timezone(custom_offset)
+                    print(f"✓ Timezone updated to {get_timezone_display()}")
+                else:
+                    print("❌ Invalid offset range. Hours: 0-14, Minutes: 0-59")
+            except ValueError:
+                print("❌ Invalid format. Please use +HH:MM or -HH:MM")
+        else:
+            print("❌ Invalid format. Please use +HH:MM or -HH:MM")
+    else:
+        print("❌ Invalid choice")
 
 
 def get_cloudwatch_log_groups_from_db(db_manager: DuckDBManager):
@@ -782,6 +892,7 @@ def main():
 
     # Get AWS account info for directory organization
     session_info = get_session_info()
+    session_info['timezone'] = get_timezone_display()  # Add timezone information
     account_id = session_info.get('account_id')
     account_alias = session_info.get('account_alias')
 
@@ -802,6 +913,10 @@ def main():
     db_manager.initialize_database()
 
     try:
+        # Run database migration to fix any existing log entries with ARN format
+        logger.info("Running database migration for Web ACL ID format...")
+        db_manager.migrate_web_acl_ids()
+        
         # Interactive mode: Menu-driven workflow
         if interactive_mode:
             while True:
@@ -967,7 +1082,7 @@ def main():
                         selected_web_acl_ids = [selected_web_acl_id]
                         print(f"\n📊 Generating report for Web ACL: {selected_web_acl_name}...")
 
-                    generate_excel_report(db_manager, output_path, selected_web_acl_ids)
+                    generate_excel_report(db_manager, output_path, selected_web_acl_ids, session_info)
 
                     print(f"\n✓ Excel report generated: {output_path}")
                     print("\nNext steps:")
@@ -985,11 +1100,19 @@ def main():
                         print(f"{table:30s}: {count:>10,} records")
                     print("="*80)
 
+                elif choice == '6':
+                    # Configure Timezone
+                    configure_timezone()
+
                 else:
-                    print("❌ Invalid choice. Please enter 0-5.")
+                    print("❌ Invalid choice. Please enter 0-6.")
 
         # Non-interactive mode: Traditional CLI workflow
         else:
+            # Run database migration to fix any existing log entries with ARN format
+            logger.info("Running database migration for Web ACL ID format...")
+            db_manager.migrate_web_acl_ids()
+            
             # Fetch WAF configurations
             if not args.skip_config:
                 scope = args.scope or 'REGIONAL'
@@ -1054,7 +1177,7 @@ def main():
                 timestamp = format_datetime(datetime.now(), 'filename')
                 output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
 
-            generate_excel_report(db_manager, output_path)
+            generate_excel_report(db_manager, output_path, None, session_info)
 
             # Show summary
             print("\n" + "="*60)

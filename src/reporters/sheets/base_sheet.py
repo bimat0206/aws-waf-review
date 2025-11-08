@@ -104,6 +104,42 @@ class BaseSheet:
         if highlight:
             cell.fill = self.highlight_fill
 
+    def _format_data_rows_bulk(self, ws, start_row, data_rows, start_col=1, alternating_highlight=True):
+        """
+        Format multiple data rows efficiently in bulk.
+
+        Args:
+            ws: Worksheet object
+            start_row: Starting row number
+            data_rows: List of lists containing row data
+            start_col: Starting column number (default: 1)
+            alternating_highlight: Whether to apply alternating row highlighting (default: True)
+        """
+        for row_idx, row_data in enumerate(data_rows):
+            row_num = start_row + row_idx
+            highlight = alternating_highlight and row_idx % 2 == 0
+            
+            # Use append() for bulk insertion if at the end of the sheet
+            if row_num == ws.max_row + 1:
+                ws.append(row_data)
+                actual_row = ws.max_row  # Get the actual row number after append
+            else:
+                # Insert at specific row if not at the end
+                for col_idx, value in enumerate(row_data, start=start_col):
+                    cell = ws.cell(row=row_num, column=col_idx)
+                    cell.value = value
+                    cell.font = self.data_font
+                    cell.border = self.thin_border
+                    cell.alignment = Alignment(vertical='center', wrap_text=False)
+                    if highlight:
+                        cell.fill = self.highlight_fill
+            # Apply highlighting to the entire row after insertion
+            if highlight and row_num != ws.max_row:  # Only if not using append
+                for col_idx in range(start_col, start_col + len(row_data)):
+                    cell = ws.cell(row=row_num, column=col_idx)
+                    if not cell.fill or cell.fill == self.highlight_fill:
+                        cell.fill = self.highlight_fill
+
     def _add_sheet_title(self, ws, title, row=1, merge_range='A1:D1'):
         """
         Add a professional title to a sheet.

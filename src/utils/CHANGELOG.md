@@ -335,6 +335,11 @@ print(f"Prefix: {prefix}")  # 2025/11/07/
 - Requires valid AWS credentials with appropriate permissions
 - Uses system timezone settings (converts to UTC)
 
+## [1.1.1] - 2025-11-08
+
+### Changed
+- **Time Helpers (`time_helpers.py`)**: Optimized bucket generation functions (`get_hourly_buckets` and `get_daily_buckets`) to use list comprehensions instead of loops for better performance with large date ranges
+
 ### Known Limitations
 
 #### AWS Helpers

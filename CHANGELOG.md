@@ -5,6 +5,40 @@ All notable changes to the AWS WAF Security Analysis Tool will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-11-08
+
+### Added
+
+- **Sheet Descriptions**: Added comprehensive descriptions to all Excel report sheets explaining their purpose and metrics
+  - Executive Summary: Added AWS account information section and detailed metric explanations
+  - Traffic Analysis: Added description explaining daily trends and geographic distribution
+  - Rule Effectiveness: Added detailed explanations of hit rates, block rates, and color coding
+  - Client Analysis: Added descriptions for IP tracking, bot detection, and user agent analysis
+  - Geographic Blocked Traffic: Added threat level criteria and risk assessment explanations
+- **AWS Account Information**: Executive Summary now displays AWS Account ID, Account Name (alias), Region, and Profile at the top of the report
+- **Timezone Configuration**: Added interactive timezone configuration option in main menu
+  - Users can select from preset timezones (UTC, UTC+7, UTC+8, UTC+9, UTC-5, UTC-8) or enter custom timezone
+  - Default timezone is UTC+7 (Bangkok/Jakarta/Ho Chi Minh)
+  - Timezone information is displayed in Executive Summary sheet for report clarity
+  - Current timezone shown in interactive menu header
+- **Enhanced Empty Data Handling**: Traffic Analysis sheet now shows helpful messages when daily trend data is unavailable
+
+### Changed
+
+- **Chart Positioning**: Repositioned all visualization charts to the right side of data tables for improved readability and professional layout
+  - Executive Summary: Removed action distribution chart to keep focus on summary data
+  - Traffic Analysis: Daily trends and geographic charts now positioned on the right (column G)
+  - Rule Effectiveness: Rule and attack type charts positioned on the right (column I)
+  - Geographic Blocked Traffic: Geographic threat chart positioned on the right (column H)
+  - Client Analysis: Hourly pattern chart positioned on the right (column H)
+  - Rule Action Distribution: Action distribution chart positioned on the right (column I)
+- **Chart Sizing**: Optimized chart dimensions for side-by-side layout (650-700px width, 350-450px height)
+
+### Fixed
+
+- **Excel Report Generation**: Fixed `NameError: name 'PatternFill' is not defined` in Geographic Blocked Traffic sheet by adding missing import
+- **Metrics Calculator Web ACL Filtering**: Added missing Web ACL ID filtering to `get_attack_type_distribution()` and `get_bot_traffic_analysis()` methods to ensure accurate metrics when analyzing specific Web ACLs
+
 ## [1.3.0] - 2025-11-07
 
 ### Added
@@ -278,19 +312,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux (tested)
 - Windows (should work, but not primary target)
 
-## [Unreleased]
+## [1.3.4] - 2025-11-08
 
-### Planned Features
-- Real-time monitoring mode
-- Integration with SIEM platforms
-- Automated remediation suggestions
-- Custom rule development assistance
-- Support for WAF v1 (Classic)
-- Additional visualization types
-- Web-based dashboard
-- Scheduled analysis with cron jobs
-- Email report delivery
-- Comparison between time periods
+### Fixed
+- **Excel Report Issue**: Resolved empty reports by fixing Web ACL ID extraction in log parser and adding database migration. The logs contain full ARNs in the `webaclId` field (e.g., "arn:aws:wafv2:...:webacl/name/id") but the database stores only the ID part. The log parser now extracts just the ID portion from the ARN to ensure proper table joins between log data and Web ACL configuration data. Added automatic migration for existing databases to convert old ARN format log entries to ID format.
+
+## [1.3.3] - 2025-11-08
+
+### Changed
+- **Performance Improvements**: 
+  - Added composite indexes to DuckDB manager for improved query performance
+  - Optimized bulk log insertion in DuckDB manager to reduce JSON processing and database round trips
+  - Reduced database round trips in metrics calculator by fetching total requests in a single query
+  - Improved user-agent extraction efficiency in log parser
+  - Enhanced batch parsing performance in log parser
+  - Added parallel processing for S3 log downloads using ThreadPoolExecutor
+  - Optimized bucket generation functions in time helpers to use list comprehensions
+  - Implemented bulk data insertion method for Excel report generation
 
 ---
 

@@ -186,17 +186,18 @@ class RuleActionDistributionSheet(BaseSheet):
 
                 row += 1
 
-        # Add visualization
-        row += 2
-        try:
-            if action_dist:
+        # Add visualization on the right side
+        action_dist = metrics.get('action_distribution', {})
+        if action_dist:
+            try:
                 chart_buffer = self.viz.create_action_distribution_chart(action_dist)
                 img = XLImage(chart_buffer)
-                img.width = 700
-                img.height = 450
-                ws.add_image(img, f'A{row}')
-        except Exception as e:
-            logger.warning(f"Could not create action distribution chart: {e}")
+                img.width = 650
+                img.height = 400
+                # Place chart starting at column I (right side of the data table)
+                ws.add_image(img, 'I5')
+            except Exception as e:
+                logger.warning(f"Could not create action distribution chart: {e}")
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 40
@@ -206,3 +207,8 @@ class RuleActionDistributionSheet(BaseSheet):
         ws.column_dimensions['E'].width = 15
         ws.column_dimensions['F'].width = 20
         ws.column_dimensions['G'].width = 35
+        ws.column_dimensions['H'].width = 2  # Gap
+        ws.column_dimensions['I'].width = 2
+        ws.column_dimensions['J'].width = 2
+        ws.column_dimensions['K'].width = 2
+        ws.column_dimensions['L'].width = 2

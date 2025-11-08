@@ -2,6 +2,11 @@
 
 All notable changes to the storage module will be documented in this file.
 
+## [1.0.6] - 2025-11-08
+
+### Added
+- **Database Migration Function**: Added `migrate_web_acl_ids()` function with error handling to convert existing log entries from ARN format to ID format, fixing reports with historical data
+
 ## [1.0.3] - 2025-11-07
 
 ### Fixed
@@ -382,3 +387,11 @@ db.vacuum()  # Optimize after large operations
 
 #### DuckDB Manager (`duckdb_manager.py`)
 - **Duplicate log_id collisions**: Bulk inserts now read `MAX(log_id)` and offset the next batch to ensure unique primary keys. Previously every batch started at `0`, so a second import triggered `Constraint Error: Duplicate key "log_id: 0"`.
+
+### Changed
+
+#### DuckDB Manager (`duckdb_manager.py`)
+- Added composite indexes for improved query performance: `idx_logs_action_timestamp`, `idx_logs_web_acl_action`, `idx_logs_client_ip_timestamp`, `idx_logs_country_action`
+- Optimized bulk data insertion in `insert_log_entries` method by reducing JSON processing and database round trips
+- Improved efficiency of user agent extraction during log insertion
+- Enhanced timestamp handling to avoid repeated calls

@@ -180,6 +180,7 @@ class DuckDBManager:
         # Create indexes for performance
         logger.info("Creating indexes...")
 
+        # Single column indexes
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON waf_logs(timestamp)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_web_acl ON waf_logs(web_acl_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_action ON waf_logs(action)")
@@ -188,6 +189,12 @@ class DuckDBManager:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_terminating_rule ON waf_logs(terminating_rule_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_associations_web_acl ON resource_associations(web_acl_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_rules_web_acl ON rules(web_acl_id)")
+        
+        # Composite indexes for common query patterns
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_action_timestamp ON waf_logs(action, timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_web_acl_action ON waf_logs(web_acl_id, action)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_client_ip_timestamp ON waf_logs(client_ip, timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_country_action ON waf_logs(country, action)")
 
         logger.info("Database initialization complete")
 
@@ -400,7 +407,8 @@ class DuckDBManager:
                 json.dumps(entry.get('labels', []), cls=DateTimeEncoder),
                 entry.get('ja3Fingerprint'),
                 entry.get('ja4Fingerprint'),
-                entry.get('httpRequest', {}).get('headers', [{}])[0].get('value') if entry.get('httpRequest', {}).get('headers') else None,
+                # Extract user agent from headers if present - more efficient approach
+                (lambda headers: next((header.get('value') for header in headers if header.get('name', '').lower() == 'user-agent'), None))(entry.get('httpRequest', {}).get('headers', [])),
                 json.dumps(entry.get('httpRequest', {}).get('headers', []), cls=DateTimeEncoder),
                 entry.get('responseCodeSent'),
                 entry.get('httpSourceName'),
@@ -496,6 +504,44 @@ class DuckDBManager:
         conn = self.connect()
         conn.execute("VACUUM")
         logger.info("Database optimization complete")
+
+    def migrate_web_acl_ids(self) -> int:
+        """
+        Migrate existing log entries to extract Web ACL ID from ARN format.
+        This fixes the issue where log entries stored full ARN instead of just the ID,
+        which caused joins with web_acls table to fail.
+
+        Returns:
+            int: Number of records updated
+        """
+        logger.info("Starting Web ACL ID migration...")
+        conn = self.connect()
+        
+        try:
+            # Count logs with ARN format before migration
+            arn_count = conn.execute("""
+                SELECT COUNT(*) 
+                FROM waf_logs 
+                WHERE web_acl_id LIKE 'arn:aws:wafv2:%'
+            """).fetchone()[0]
+            
+            if arn_count > 0:
+                logger.info(f"Found {arn_count} log entries with ARN format, migrating...")
+                # Extract just the ID part from the ARN (last segment after the final '/')
+                conn.execute("""
+                    UPDATE waf_logs 
+                    SET web_acl_id = SPLIT_PART(web_acl_id, '/', -1)
+                    WHERE web_acl_id LIKE 'arn:aws:wafv2:%'
+                """)
+                logger.info(f"Migrated {arn_count} log entries from ARN to ID format")
+            else:
+                logger.info("No log entries with ARN format found, no migration needed")
+            
+            return arn_count
+        except Exception as e:
+            logger.error(f"Error during Web ACL ID migration: {e}")
+            logger.warning("Continuing without migration - existing log data may have incorrect web_acl_id format")
+            return 0
 
     def export_to_parquet(self, table_name: str, output_path: str) -> None:
         """
