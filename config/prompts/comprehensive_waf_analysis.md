@@ -156,25 +156,30 @@ Provide output in **structured markdown** format below. Be concise but specific 
 
 **Critical Findings (Immediate Action Required):**
 
-| No | Finding | Expected Impact | Action Items | Rationale |
-|----|---------|-----------------|--------------|-----------|
-| 1 | [Finding title] | [Specific business/security impact] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Evidence from metrics/data] |
-| 2 | [Finding title] | [Impact description] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Evidence and reasoning] |
+| No | Recommendation | Expected Impact | Action Items | Rationale |
+|----|----------------|-----------------|--------------|-----------|
+| 1 | [Concise recommendation title] | [Quantified expected improvement with percentage or metrics] | • [Specific action item 1 with exact rule/config]<br>• [Specific action item 2 with exact rule/config]<br>• [Specific action item 3 with exact rule/config] | [Evidence from metrics with specific data points, trends, and security risks. Reference exact numbers, dates, and anomalies from the analysis data.] |
+| 2 | [Concise recommendation title] | [Quantified impact description] | • [Specific action item 1]<br>• [Specific action item 2]<br>• [Specific action item 3] | [Evidence and reasoning with specific metrics] |
+
+**Example:**
+| No | Recommendation | Expected Impact | Action Items | Rationale |
+|----|----------------|-----------------|--------------|-----------|
+| 1 | Refine Default_Action Configuration | 15–20% reduction in default rule dependency, improving threat detection and visibility, especially for subtle attacks not caught by current rules | • Analyze traffic processed by the Default_Action rule (77.91% of triggers, 100% ALLOW, per WAF logs) and develop targeted rules to reduce reliance on the default Allow action<br>• Consider setting a default Challenge action for high-risk traffic patterns (e.g., anonymous IPs, admin URIs) where applicable | The Web ACL's DefaultAction: Allow and Default_Action rule dominance risk undetected malicious traffic, as evidenced by the 1.1% block rate (9,938 requests) and anomalies like January 27 (6,838 blocks) and February 18 (3,628 SQLi challenges). This permissive posture, combined with no specific action overrides for most rules, leaves gaps in threat detection. |
 
 **Mid/Long-Term Recommendations (Strategic Approach):**
 
 *These initiatives require ongoing effort to maintain and improve the WAF's effectiveness over time.*
 
-| No | Finding | Expected Impact | Action Items | Rationale |
-|----|---------|-----------------|--------------|-----------|
-| 1 | [Recommendation title] | [Expected improvement] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3]<br>• [Action item 4]<br>• [Action item 5] | [Evidence and strategic reasoning] |
-| 2 | [Recommendation title] | [Impact description] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Why this is important long-term] |
+| No | Recommendation | Expected Impact | Action Items | Rationale |
+|----|----------------|-----------------|--------------|-----------|
+| 1 | [Strategic recommendation title] | [Quantified expected improvement] | • [Strategic action item 1]<br>• [Strategic action item 2]<br>• [Strategic action item 3]<br>• [Strategic action item 4]<br>• [Strategic action item 5] | [Evidence from data showing trends and patterns that justify long-term approach. Include specific metrics and business context.] |
+| 2 | [Strategic recommendation title] | [Impact description with metrics] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Why this is important long-term with evidence] |
 
 **Low Priority Suggestions (Nice to Have):**
 
-| No | Finding | Expected Impact | Action Items | Rationale |
-|----|---------|-----------------|--------------|-----------|
-| 1 | [Suggestion title] | [Marginal improvement] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Why this is optional] |
+| No | Recommendation | Expected Impact | Action Items | Rationale |
+|----|----------------|-----------------|--------------|-----------|
+| 1 | [Suggestion title] | [Marginal improvement with percentage] | • [Action item 1]<br>• [Action item 2]<br>• [Action item 3] | [Why this is optional with minimal data support] |
 
 ---
 
@@ -462,19 +467,38 @@ Based on attack patterns, create custom rule for:
 
 ## Critical Requirements for Section 1 (Executive Summary)
 
+**Recommendation Format:**
+- **Recommendation (Title):** Concise, action-oriented title (e.g., "Refine Default_Action Configuration")
+- **Expected Impact:** Quantified improvement with percentages or metrics (e.g., "15–20% reduction in default rule dependency")
+- **Action Items:** 2-5 specific, implementable actions with exact rule IDs, configurations, or IP addresses
+- **Rationale:** Evidence-based explanation referencing specific metrics, dates, anomalies, and data points from the analysis
+
 **Action Items Format:**
-- Each finding MUST have **3-5 detailed, concise bullet points** for Action Items
+- Each finding MUST have **2-5 detailed, concise bullet points** for Action Items
 - Each action item should be specific and implementable
 - Include exact rule IDs, IP addresses, or configuration values where applicable
 - Format using bullet points (•) with line breaks (`<br>`) between items
 - Example:
   ```
+  • Analyze traffic processed by the Default_Action rule (77.91% of triggers, 100% ALLOW, per WAF logs) and develop targeted rules to reduce reliance on the default Allow action
+  • Consider setting a default Challenge action for high-risk traffic patterns (e.g., anonymous IPs, admin URIs) where applicable
   • Enable AWS-AWSManagedRulesBotControlRuleSet (WCU: 50)
   • Configure JA3 fingerprinting threshold to block requests with score >90
   • Add CloudWatch alarm for bot traffic spike (>1000 requests/5min)
-  • Review and whitelist legitimate bot user-agents (GoogleBot, BingBot)
-  • Schedule weekly review of bot block logs for false positives
   ```
+
+**Rationale Format:**
+- Reference specific metrics from the data (e.g., "1.1% block rate (9,938 requests)")
+- Cite specific anomalies or patterns (e.g., "January 27 (6,838 blocks)")
+- Explain the security risk or business impact
+- Connect evidence to the recommendation
+- Example: "The Web ACL's DefaultAction: Allow and Default_Action rule dominance risk undetected malicious traffic, as evidenced by the 1.1% block rate (9,938 requests) and anomalies like January 27 (6,838 blocks) and February 18 (3,628 SQLi challenges)."
+
+**Expected Impact Format:**
+- Provide quantified estimates (e.g., "15–20% reduction")
+- Include specific improvements (e.g., "improving threat detection and visibility")
+- Mention what types of attacks will be better detected
+- Example: "15–20% reduction in default rule dependency, improving threat detection and visibility, especially for subtle attacks not caught by current rules"
 
 **DO NOT Include:**
 - Timeline information (no "Within 24-48 hours", "30 days", etc.)

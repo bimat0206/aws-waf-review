@@ -274,7 +274,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of traffic pattern or anomaly]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action to take]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -300,7 +300,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of rule performance issue or optimization opportunity]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action to improve rule effectiveness]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -326,7 +326,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of geographic threat pattern]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific mitigation strategy]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -341,12 +341,23 @@ Focus on:
         """Create prompt for rule action distribution findings."""
         action_dist = metrics.get('action_distribution', {})
 
+        # Extract counts from potentially dict values
+        def _extract_count(value):
+            if isinstance(value, dict):
+                return value.get('count', 0)
+            return value or 0
+
+        allow_count = _extract_count(action_dist.get('ALLOW', 0))
+        block_count = _extract_count(action_dist.get('BLOCK', 0))
+        count_count = _extract_count(action_dist.get('COUNT', 0))
+        total = max(allow_count + block_count + count_count, 1)
+
         return f"""Analyze the following rule action distribution and provide 3-5 key findings.
 
 ## Action Distribution:
-- ALLOW: {action_dist.get('ALLOW', 0):,} ({action_dist.get('ALLOW', 0) / max(sum(action_dist.values()), 1) * 100:.1f}%)
-- BLOCK: {action_dist.get('BLOCK', 0):,} ({action_dist.get('BLOCK', 0) / max(sum(action_dist.values()), 1) * 100:.1f}%)
-- COUNT: {action_dist.get('COUNT', 0):,} ({action_dist.get('COUNT', 0) / max(sum(action_dist.values()), 1) * 100:.1f}%)
+- ALLOW: {allow_count:,} ({allow_count / total * 100:.1f}%)
+- BLOCK: {block_count:,} ({block_count / total * 100:.1f}%)
+- COUNT: {count_count:,} ({count_count / total * 100:.1f}%)
 
 ## Instructions:
 Provide 3-5 concise findings in this EXACT format:
@@ -354,7 +365,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of action distribution insight]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific configuration adjustment]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -380,7 +391,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of client behavior pattern]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action regarding client traffic]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
