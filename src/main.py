@@ -737,6 +737,8 @@ def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any
         print("1. GPT-OSS 120B (Production - ~$3/$9 per 1M tokens)")
         print("2. GPT-OSS 20B (Fast & Cheap - ~$0.50/$1.50 per 1M tokens)")
         print("0. Cancel")
+        print("\n⚠️  Note: Requires model access enabled in AWS Bedrock console")
+        print(f"   Visit: https://console.aws.amazon.com/bedrock/home#/modelaccess")
 
         model_choice = input("\nEnter choice (0-2): ").strip()
 
@@ -745,8 +747,10 @@ def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any
             return None
         elif model_choice == '1':
             model = 'openai.gpt-oss-120b-1:0'
+            print(f"✓ Selected: GPT-OSS 120B")
         elif model_choice == '2':
             model = 'openai.gpt-oss-20b-1:0'
+            print(f"✓ Selected: GPT-OSS 20B")
         else:
             print("❌ Invalid choice")
             return None
