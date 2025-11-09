@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.8.0] - 2025-11-09
 
+### Fixed
+
+#### Export Directory Structure
+- **Excel Report Output**: Fixed Excel reports to export to account-specific subdirectory `output/{account_identifier}/` instead of root `output/` directory
+  - Updated all 3 Excel export locations in main.py (interactive mode, LLM analysis, non-interactive mode)
+  - Ensures consistent directory structure with other exports
+- **Directory Consistency**: All exports now properly use account-specific subdirectories:
+  - ✅ Excel reports: `output/{account_identifier}/*_waf_report.xlsx`
+  - ✅ Raw LLM responses: `raw-llm-response/{account_identifier}/*.md`
+  - ✅ Exported prompts: `exported-prompt/{account_identifier}/*.txt`
+  - ✅ Raw logs: `raw-logs/{account_identifier}/*_raw_logs.json`
+
+#### Excel Cell Formatting for Large Content
+- **Improved Row Height Calculation**: Enhanced row height calculation in LLM Recommendations sheet
+  - Now counts actual newlines in action items (bullet points) instead of estimating
+  - Calculates rationale text wrapping based on ~80 characters per line
+  - Uses maximum of action items lines and rationale lines for height
+  - Increased maximum row height from 120 to 200 points for better readability
+  - Minimum height remains 40 points
+- **Increased Column Widths**: Adjusted column widths for better text display
+  - Recommendation: 35 → 40 characters (longer titles)
+  - Expected Impact: 25 → 30 characters
+  - Action Items: 40 → 50 characters (accommodates bullet lists)
+  - Rationale: 30 → 40 characters (long explanations)
+- **Better Text Wrapping**: All text columns now properly wrap with `vertical='top'` alignment
+
+**Files Updated**:
+- [src/main.py](src/main.py:963-964,1413-1414,1553-1554) - Fixed output directory paths for Excel reports
+- [src/reporters/sheets/llm_recommendations.py](src/reporters/sheets/llm_recommendations.py:359-384) - Improved row height and column width calculations
+
 ### Changed
 
 #### OpenAI Provider Improvements

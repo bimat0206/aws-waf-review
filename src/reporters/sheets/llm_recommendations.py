@@ -356,15 +356,29 @@ class LLMRecommendationsSheet(BaseSheet):
                     elif col_idx in [2, 3, 4, 5]:  # Text columns - wrap text
                         cell.alignment = Alignment(wrap_text=True, vertical='top')
 
-                # Adjust row height based on content
-                ws.row_dimensions[row].height = max(40, min(len(str(row_data[3])) // 40, 120))
+                # Adjust row height based on content - calculate based on newlines and text length
+                action_items_text = str(row_data[3]) if row_data[3] else ''
+                rationale_text = str(row_data[4]) if row_data[4] else ''
+
+                # Count lines in action items (each bullet point is a line)
+                action_lines = action_items_text.count('\n') + 1 if action_items_text else 1
+
+                # Estimate lines needed for rationale (assuming ~80 chars per line in Excel)
+                rationale_lines = max(1, len(rationale_text) // 80) if rationale_text else 1
+
+                # Use the maximum of action items lines and rationale lines
+                estimated_lines = max(action_lines, rationale_lines, 2)
+
+                # Set height: ~15 points per line, minimum 40, maximum 200
+                calculated_height = estimated_lines * 15
+                ws.row_dimensions[row].height = max(40, min(calculated_height, 200))
                 row += 1
 
             row += 2
 
         # Auto-adjust columns for new format
         ws.column_dimensions['A'].width = 6   # No
-        ws.column_dimensions['B'].width = 35  # Recommendation
-        ws.column_dimensions['C'].width = 25  # Expected Impact
-        ws.column_dimensions['D'].width = 40  # Action Items
-        ws.column_dimensions['E'].width = 30  # Rationale
+        ws.column_dimensions['B'].width = 40  # Recommendation (increased for longer titles)
+        ws.column_dimensions['C'].width = 30  # Expected Impact (increased)
+        ws.column_dimensions['D'].width = 50  # Action Items (increased for bullet lists)
+        ws.column_dimensions['E'].width = 40  # Rationale (increased for long explanations)
