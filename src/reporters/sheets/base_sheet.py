@@ -183,6 +183,101 @@ class BaseSheet:
         ws[f'A{row}'].font = self.subtitle_font
         ws.merge_cells(merge_range)
 
+    def _add_llm_findings_section(self, ws, start_row, section_title="LLM-Generated Findings", merge_cols='A:E', findings=None):
+        """
+        Add an LLM-generated findings section with template or populated data.
+
+        Args:
+            ws: Worksheet object
+            start_row: Starting row number
+            section_title: Title for the findings section
+            merge_cols: Column range for merging (default: 'A:E')
+            findings: Optional list of finding dicts with keys: finding, severity, recommendation
+
+        Returns:
+            int: Next available row number after the section
+        """
+        row = start_row
+
+        # Section header
+        ws[f'A{row}'] = section_title
+        ws[f'A{row}'].font = Font(bold=True, size=14, color='1F4E78', name='Calibri')
+        ws[f'A{row}'].alignment = Alignment(horizontal='left', vertical='center')
+        merge_range = f'A{row}:{merge_cols.split(":")[1]}{row}'
+        ws.merge_cells(merge_range)
+        ws.row_dimensions[row].height = 25
+        row += 1
+
+        # Instructions (only show in template mode)
+        if not findings or len(findings) == 0:
+            ws[f'A{row}'] = 'Instructions: This section will be automatically populated when LLM analysis is run (Option 6 in main menu).'
+            ws[f'A{row}'].font = Font(italic=True, size=10, color='666666', name='Calibri')
+            merge_range = f'A{row}:{merge_cols.split(":")[1]}{row}'
+            ws.merge_cells(merge_range)
+            row += 1
+
+        # Template table
+        headers = ['No', 'Finding', 'Severity', 'Recommendation']
+        self._format_header_row(ws, row, headers)
+        row += 1
+
+        # Populate with findings or add template rows
+        if findings and len(findings) > 0:
+            # Populated mode - add actual findings
+            for idx, finding in enumerate(findings, start=1):
+                # Column 1: Number
+                cell = ws.cell(row=row, column=1)
+                cell.value = idx
+                cell.font = Font(bold=True, size=10, name='Calibri')
+                cell.border = self.thin_border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+                # Column 2: Finding (wrap text)
+                cell = ws.cell(row=row, column=2)
+                cell.value = finding.get('finding', '')
+                cell.font = self.data_font
+                cell.border = self.thin_border
+                cell.alignment = Alignment(vertical='center', wrap_text=True)
+
+                # Column 3: Severity (color-coded)
+                severity = finding.get('severity', 'MEDIUM').upper()
+                cell = ws.cell(row=row, column=3)
+                cell.value = severity
+                cell.font = Font(bold=True, size=10, name='Calibri')
+                cell.border = self.thin_border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+                # Color-code severity
+                if severity == 'HIGH':
+                    cell.fill = self.danger_fill  # Red
+                elif severity == 'MEDIUM':
+                    cell.fill = self.warning_fill  # Yellow
+                elif severity == 'LOW':
+                    cell.fill = self.success_fill  # Green
+
+                # Column 4: Recommendation (wrap text)
+                cell = ws.cell(row=row, column=4)
+                cell.value = finding.get('recommendation', '')
+                cell.font = self.data_font
+                cell.border = self.thin_border
+                cell.alignment = Alignment(vertical='center', wrap_text=True)
+
+                # Set row height for wrapped text
+                ws.row_dimensions[row].height = 60
+                row += 1
+        else:
+            # Template mode - add 3 empty rows
+            for i in range(3):
+                highlight = i % 2 == 0
+                for col_idx in range(1, 5):
+                    cell = ws.cell(row=row, column=col_idx)
+                    cell.border = self.thin_border
+                    if highlight:
+                        cell.fill = self.highlight_fill
+                row += 1
+
+        return row
+
     def create(self, workbook, *args, **kwargs):
         """
         Create the sheet. Must be implemented by subclasses.

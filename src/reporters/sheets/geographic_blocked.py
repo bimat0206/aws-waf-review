@@ -17,7 +17,7 @@ class GeographicBlockedTrafficSheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any]) -> None:
+    def build(self, metrics: Dict[str, Any], llm_findings: list = None) -> None:
         """
         Create the Geographic Distribution of Blocked Traffic sheet.
 
@@ -37,6 +37,10 @@ class GeographicBlockedTrafficSheet(BaseSheet):
           - HIGH: >50% block rate with >50 blocked requests
           - MEDIUM: >25% block rate or >100 blocked requests
           - LOW: Below medium thresholds
+
+        Args:
+            metrics: Dictionary containing calculated metrics
+            llm_findings: Optional list of LLM-generated findings
         """
         logger.info("Creating Geographic Distribution of Blocked Traffic sheet...")
 
@@ -183,6 +187,10 @@ class GeographicBlockedTrafficSheet(BaseSheet):
                 ws.add_image(img, 'H5')
             except Exception as e:
                 logger.warning(f"Could not create geographic chart: {e}")
+
+        # Add LLM Findings Section
+        row_for_findings = row + 3 if geo_data else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Geographic Threat Analysis Findings", merge_cols='A:G', findings=llm_findings)
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 20
