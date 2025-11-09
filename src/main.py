@@ -960,7 +960,8 @@ def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any
 
         # Generate Excel report with LLM recommendations
         print("\n📊 Generating Excel report with LLM recommendations...")
-        output_path = f"output/{account_identifier}_{timestamp}_waf_report_with_llm.xlsx"
+        output_dir = dir_paths.get('output', f'output/{account_identifier}')
+        output_path = f"{output_dir}/{account_identifier}_{timestamp}_waf_report_with_llm.xlsx"
 
         # Get all the data needed for Excel report
         conn = db_manager.get_connection()
@@ -1409,7 +1410,8 @@ def main():
 
                     # Auto-generate output filename
                     timestamp = format_datetime(datetime.now(), 'filename')
-                    output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
+                    output_dir = dir_paths.get('output', f'output/{account_identifier}')
+                    output_path = f"{output_dir}/{account_identifier}_{timestamp}_waf_report.xlsx"
 
                     # Get list of Web ACLs for selection
                     conn = db_manager.get_connection()
@@ -1548,7 +1550,8 @@ def main():
                 output_path = args.output
             else:
                 timestamp = format_datetime(datetime.now(), 'filename')
-                output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
+                output_dir = dir_paths.get('output', f'output/{account_identifier}')
+                output_path = f"{output_dir}/{account_identifier}_{timestamp}_waf_report.xlsx"
 
             generate_excel_report(db_manager, output_path, None, session_info)
 
