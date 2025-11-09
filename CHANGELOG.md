@@ -5,6 +5,135 @@ All notable changes to the AWS WAF Security Analysis Tool will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2025-11-09
+
+### Added
+
+#### Sheet-Specific LLM-Generated Findings
+- **NEW FEATURE**: Auto-populated LLM findings on all 5 analysis sheets
+- **Comprehensive Analysis**: Each analysis sheet now receives AI-powered insights specific to its data type
+- **Sheet Coverage**:
+  - **Traffic Analysis**: Traffic patterns, geographic distribution, DDoS indicators
+  - **Rule Effectiveness**: Unused rules, false positives, optimization opportunities
+  - **Geographic Blocked Traffic**: High-risk countries, geo-blocking recommendations
+  - **Rule Action Distribution**: ALLOW/BLOCK/COUNT balance, security posture evaluation
+  - **Client Analysis**: Suspicious IP detection, bot traffic, rate limiting recommendations
+- **LLM Integration Methods**:
+  - `analyze_sheet_findings()` - Generates sheet-specific findings from metrics
+  - `parse_sheet_findings()` - Extracts structured findings from LLM responses
+  - 5 specialized prompt generators for each analysis type
+- **Dual Display Modes**:
+  - **Template Mode**: Shows instructions + empty rows (when LLM analysis not run)
+  - **Populated Mode**: Displays actual AI-generated findings with color-coded severity
+- **Severity Color Coding**:
+  - 🔴 **HIGH** - Red background (#FFC7CE) for critical issues
+  - 🟡 **MEDIUM** - Yellow background (#FFEB9C) for moderate concerns
+  - 🟢 **LOW** - Green background (#C6EFCE) for minor improvements
+- **User Experience**:
+  - Progress indicators during analysis: "Analyzing traffic patterns..."
+  - Graceful error handling: continues with empty findings if generation fails
+  - Shorter prompts (max 2000 tokens) for faster analysis
+- **Workflow Integration**:
+  - Automatically runs after comprehensive WAF analysis (Option 6)
+  - Generates findings for all 5 sheets sequentially
+  - Passes findings to Excel generator for population
+
+**Files Added**:
+- No new files - enhanced existing architecture
+
+**Files Updated**:
+- [src/llm/analyzer.py](src/llm/analyzer.py:177-450) - Added `analyze_sheet_findings()` and 5 prompt generators
+- [src/llm/response_parser.py](src/llm/response_parser.py:383-432) - Added `parse_sheet_findings()` method
+- [src/reporters/sheets/base_sheet.py](src/reporters/sheets/base_sheet.py:186-279) - Enhanced `_add_llm_findings_section()` with dual modes
+- [src/reporters/sheets/traffic_analysis.py](src/reporters/sheets/traffic_analysis.py:20-39,152) - Added `llm_findings` parameter
+- [src/reporters/sheets/rule_effectiveness.py](src/reporters/sheets/rule_effectiveness.py:20-43,142) - Added `llm_findings` parameter
+- [src/reporters/sheets/geographic_blocked.py](src/reporters/sheets/geographic_blocked.py:20-44,193) - Added `llm_findings` parameter
+- [src/reporters/sheets/rule_action_distribution.py](src/reporters/sheets/rule_action_distribution.py:20-28,208) - Added `llm_findings` parameter
+- [src/reporters/sheets/client_analysis.py](src/reporters/sheets/client_analysis.py:20-41,172) - Added `llm_findings` parameter
+- [src/reporters/excel_generator.py](src/reporters/excel_generator.py:46-96) - Added `llm_sheet_findings` parameter
+- [src/main.py](src/main.py:865-925,996) - Integrated sheet findings generation into LLM workflow
+
+**Prompt Structure**:
+Each sheet-specific prompt follows a focused format:
+```
+FINDING 1:
+Finding: [Description of issue or insight]
+Severity: [HIGH/MEDIUM/LOW]
+Recommendation: [Specific action to take]
+
+FINDING 2:
+...
+```
+
+**Example Output**:
+```
+No | Finding                              | Severity | Recommendation
+1  | High traffic from blocked countries  | HIGH     | Implement geo-blocking for CN, RU
+2  | Unusual spike in evening hours       | MEDIUM   | Review rate limiting rules
+3  | Low threat score overall             | LOW      | Maintain current configuration
+```
+
+### Fixed
+
+#### Bug Fixes in Analysis Sheets
+- **Rule Action Distribution**: Fixed undefined variable `rule_data` → changed to `rule_effectiveness`
+- **Client Analysis**: Fixed undefined variable `top_clients` → changed to `top_ips`
+
+### Technical Details
+
+**New Methods in LLMAnalyzer** ([src/llm/analyzer.py](src/llm/analyzer.py)):
+- `analyze_sheet_findings(sheet_type, metrics, sheet_data)` - Main coordination method
+- `_create_traffic_prompt(metrics, data)` - Traffic analysis prompt generation
+- `_create_rule_effectiveness_prompt(metrics, data)` - Rule effectiveness prompt
+- `_create_geographic_prompt(metrics, data)` - Geographic threat prompt
+- `_create_rule_action_prompt(metrics, data)` - Rule action analysis prompt
+- `_create_client_prompt(metrics, data)` - Client behavior prompt
+- `_format_geo_data(data)`, `_format_rule_data(data)`, `_format_ip_data(data)` - Data formatters
+
+**Response Parser Enhancement** ([src/llm/response_parser.py](src/llm/response_parser.py)):
+```python
+def parse_sheet_findings(self, response: str) -> List[Dict[str, Any]]:
+    """
+    Parse sheet-specific findings from LLM response.
+    Returns: List of dicts with keys: finding, severity, recommendation
+    """
+```
+
+**Base Sheet Helper Enhancement** ([src/reporters/sheets/base_sheet.py](src/reporters/sheets/base_sheet.py)):
+```python
+def _add_llm_findings_section(self, ws, start_row, section_title,
+                               merge_cols='A:E', findings=None):
+    """
+    Supports both template mode (findings=None) and populated mode (findings=List[Dict])
+    """
+```
+
+**Performance Characteristics**:
+- Each sheet analysis takes ~5-10 seconds with Claude Sonnet 4
+- Total additional time: ~30-50 seconds for all 5 sheets
+- Token usage: ~1,500-2,000 tokens per sheet (input + output)
+- Cost impact: ~$0.02-0.05 additional cost per complete analysis
+
+### Benefits
+
+**For Users**:
+- Actionable insights directly on each analysis sheet
+- No need to cross-reference LLM Recommendations sheet
+- Context-specific recommendations based on actual data patterns
+- Visual severity indicators make priorities clear
+
+**For Security Teams**:
+- Faster identification of critical issues
+- Sheet-specific remediation steps
+- Better understanding of WAF effectiveness per analysis area
+- Clear prioritization with HIGH/MEDIUM/LOW severity levels
+
+**For Reporting**:
+- More comprehensive Excel reports
+- Professional appearance with color-coded findings
+- Self-contained sheets with embedded AI insights
+- Suitable for executive presentations and compliance audits
+
 ## [1.6.0] - 2025-11-08
 
 ### Added
