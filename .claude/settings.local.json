@@ -5,7 +5,8 @@
       "mcp__MCP_DOCKER__mcp-add",
       "Bash(python debug_metrics_test.py:*)",
       "Bash(python3:*)",
-      "Bash(source .venv/bin/activate)"
+      "Bash(source .venv/bin/activate)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

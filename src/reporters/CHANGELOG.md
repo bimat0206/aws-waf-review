@@ -2,6 +2,89 @@
 
 All notable changes to the reporters module will be documented in this file.
 
+## [1.3.1] - 2025-11-08
+
+### Changed
+
+#### LLM Recommendations Sheet - Security Assessment Enhancement
+- **Security Posture Display** ([llm_recommendations.py:175-206](llm_recommendations.py#L175-L206)):
+  - Changed from numeric score (0-100) to categorical assessment (HIGH/MEDIUM/LOW)
+  - Added color coding: High=Green, Medium=Orange, Low=Red
+  - Auto-conversion of legacy numeric scores to categorical (≥80→High, ≥60→Medium, <60→Low)
+- **Assessment Breakdown Section** ([llm_recommendations.py:208-246](llm_recommendations.py#L208-L246)):
+  - **NEW**: Added detailed breakdown display with 5 key metrics
+  - Metrics: Rule Coverage, Threat Detection, Logging & Monitoring, Configuration Security, Response Readiness
+  - Each metric individually color-coded (High/Medium/Low)
+  - Bullet-list format with indentation for visual hierarchy
+  - Highlighted header row for section separation
+- **Overall Assessment** ([llm_recommendations.py:248-257](llm_recommendations.py#L248-L257)):
+  - Text description with wrap text formatting
+  - Dynamic row height (40px) for longer assessments
+  - Merged across columns B-E for readability
+
+**Visual Changes**:
+- Before: Single row with numeric score (e.g., "75/100")
+- After: Multi-row section with:
+  - Overall assessment: HIGH/MEDIUM/LOW (large, bold, color-coded)
+  - Assessment Breakdown header
+  - 5 individual metrics with color-coded values
+  - Overall assessment text description
+
+## [1.3.0] - 2025-11-08
+
+### Added
+
+#### Raw LLM Response Exporter (`raw_llm_exporter.py`)
+- **New `RawLLMExporter` class** for exporting raw LLM analysis responses
+- `export_raw_response()` - Export raw LLM response text to markdown file
+- `export_full_analysis()` - Export complete analysis with metadata and parsed results
+- **Output location**: `raw-llm-response/{alias}_{account_id}/`
+- **File format**: Markdown (.md) with metadata header
+- **Filename pattern**: `{account_identifier}_{web_acl_name}_{model}_{timestamp}_response.md`
+- Automatic export after LLM analysis completes
+- Preserves complete raw response for external review and archiving
+- Professional markdown formatting with metadata section
+- Graceful error handling
+
+**Features**:
+- Per-Web ACL organization for targeted analysis
+- Metadata header with generation timestamp, account info, model details
+- Token usage and cost tracking in full analysis export
+- Safe filename sanitization for special characters
+- Complete raw data preservation separate from Excel reports
+- File size reporting for storage tracking
+
+#### LLM Recommendations Sheet Redesign (`llm_recommendations.py`)
+- **BREAKING CHANGE**: Complete redesign of recommendations table structure
+- **New Format**: Three priority sections instead of four
+  1. **Critical Findings (Immediate Action Required)** - Red header
+  2. **Mid/Long-Term Recommendations** - Orange header with subtitle about strategic approach
+  3. **Low Priority Suggestions (Nice to Have)** - Green header
+- **New Table Columns**:
+  - `No` (6 width) - Sequential numbering, center-aligned
+  - `Finding` (35 width) - Issue description
+  - `Expected Impact` (25 width) - Impact assessment
+  - `Action Items` (40 width) - Bullet list format with `•` prefix
+  - `Rationale` (30 width) - Reasoning behind recommendation
+- **Removed**: Raw response display section from Excel sheet
+- **Enhanced**: Automatic bullet list formatting for action items
+- **Enhanced**: Dynamic row height based on content length
+- **Enhanced**: Professional subtitle text for Mid/Long-Term section
+
+**Before (Old Format)**:
+- 4 priority sections (Critical, High, Medium, Low)
+- Columns: Priority, Finding/Recommendation, Impact, Action Required, Timeline
+- Raw response displayed at bottom of sheet
+- Fixed row heights
+
+**After (New Format)**:
+- 3 priority sections (Critical, Mid/Long-Term, Low Priority)
+- Columns: No, Finding, Expected Impact, Action Items, Rationale
+- No raw response in sheet (exported to separate file)
+- Dynamic row heights
+- Bullet-formatted action items
+- Professional subtitles for context
+
 ## [1.2.1] - 2025-11-07
 
 ### Fixed

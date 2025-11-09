@@ -24,16 +24,18 @@ A comprehensive Python application for analyzing AWS WAF (Web Application Firewa
 aws-waf-analyzer/
 ├── config/                                 # Configuration files
 │   ├── prompts/                           # LLM prompt templates (version controlled)
-│   │   ├── security_effectiveness.md
-│   │   ├── false_positive_analysis.md
-│   │   ├── rule_optimization.md
-│   │   └── compliance_gap_analysis.md
+│   │   └── comprehensive_waf_analysis.md  # Master prompt with all analysis sections
 │   └── waf_schema.json                    # WAF log schema definition
 ├── src/                                   # Source code
 │   ├── fetchers/                         # Data fetching modules
 │   ├── processors/                       # Data processing modules
 │   ├── storage/                          # Database management
 │   ├── reporters/                        # Report generation
+│   ├── llm/                              # LLM analysis integration
+│   │   ├── providers/                    # LLM provider implementations (Bedrock Claude/OpenAI)
+│   │   ├── prompt_injector.py           # Data injection into prompt templates
+│   │   ├── analyzer.py                  # Main LLM analyzer coordinator
+│   │   └── response_parser.py           # Parse LLM markdown responses
 │   ├── utils/                            # Utility functions
 │   └── main.py                           # Main orchestration script
 ├── data/{alias}_{account_id}/             # Account-specific DuckDB files (auto-created)
@@ -61,24 +63,24 @@ aws-waf-analyzer/
 │  ┌──────────────────────────────────────────────────────────────────┐ │
 │  │                      Main Orchestrator                           │ │
 │  │                        (main.py)                                 │ │
-│  └───┬──────────────┬──────────────┬──────────────┬─────────────┬──┘ │
-│      │              │              │              │             │    │
-│      ▼              ▼              ▼              ▼             ▼    │
-│  ┌────────┐   ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌──────┐ │
-│  │ Utils  │   │ Fetchers │   │Processors│   │ Storage │   │Report│ │
-│  │        │   │          │   │          │   │         │   │  ers │ │
-│  ├────────┤   ├──────────┤   ├──────────┤   ├─────────┤   ├──────┤ │
-│  │  AWS   │   │CloudWatch│   │   Log    │   │ DuckDB  │   │ Excel│ │
-│  │Helpers │   │ Fetcher  │   │  Parser  │   │ Manager │   │  Gen │ │
-│  │        │   │          │   │          │   │         │   │      │ │
-│  │  Time  │   │   S3     │   │  Config  │   │ Schema  │   │ Viz  │ │
-│  │Helpers │   │ Fetcher  │   │Processor │   │ Queries │   │Helper│ │
-│  │        │   │          │   │          │   │         │   │      │ │
-│  │        │   │          │   │ Metrics  │   │         │   │      │ │
-│  │        │   │          │   │Calculator│   │         │   │      │ │
-│  └────────┘   └──────────┘   └──────────┘   └─────────┘   └──────┘ │
-│      │              │              │              │             │    │
-│      └──────────────┴──────────────┴──────────────┴─────────────┘    │
+│  └───┬─────────┬──────────────┬──────────────┬──────────────┬─────────────┬──┘ │
+│      │         │              │              │              │             │    │
+│      ▼         ▼              ▼              ▼              ▼             ▼    │
+│  ┌────────┐┌─────┐   ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌──────┐ │
+│  │ Utils  ││ LLM │   │ Fetchers │   │Processors│   │ Storage │   │Report│ │
+│  │        ││     │   │          │   │          │   │         │   │  ers │ │
+│  ├────────┤├─────┤   ├──────────┤   ├──────────┤   ├─────────┤   ├──────┤ │
+│  │  AWS   ││Anlyz│   │CloudWatch│   │   Log    │   │ DuckDB  │   │ Excel│ │
+│  │Helpers ││ er  │   │ Fetcher  │   │  Parser  │   │ Manager │   │  Gen │ │
+│  │        ││     │   │          │   │          │   │         │   │      │ │
+│  │  Time  ││Prompt   │   S3     │   │  Config  │   │ Schema  │   │ Viz  │ │
+│  │Helpers ││Inject   │ Fetcher  │   │Processor │   │ Queries │   │Helper│ │
+│  │        ││     │   │          │   │          │   │         │   │      │ │
+│  │        ││Parsr│   │          │   │ Metrics  │   │         │   │      │ │
+│  │        ││     │   │          │   │Calculator│   │         │   │      │ │
+│  └────────┘└──┬──┘   └──────────┘   └──────────┘   └─────────┘   └──────┘ │
+│      │        │           │              │              │             │    │
+│      └────────┴───────────┴──────────────┴──────────────┴─────────────┘    │
 │                                   │                                  │
 └───────────────────────────────────┼──────────────────────────────────┘
                                     ▼
@@ -88,6 +90,7 @@ aws-waf-analyzer/
                     │  • AWS WAFv2 API             │
                     │  • CloudWatch Logs API       │
                     │  • S3 API                    │
+                    │  • AWS Bedrock API (LLM)     │
                     │  • DuckDB (local)            │
                     │  • Matplotlib (charts)       │
                     │  • OpenPyXL (Excel)          │
@@ -772,24 +775,37 @@ The `config/prompts/` directory contains markdown templates for AI-powered analy
 
 > **Auto-filled exports**: When you generate an Excel report, the tool now spins up `exported-prompt/{alias}_{account_id}/` with every placeholder already populated using the latest metrics, rule data, and attack summaries. You can still edit the templates manually, but most workflows can now copy/paste the enriched exports directly into your preferred LLM.
 
-### security_effectiveness.md
-Analyzes rule effectiveness, identifies gaps, and recommends improvements.
+### comprehensive_waf_analysis.md
+Master prompt template that combines all security analysis areas:
+- **Executive Summary**: Security posture score and critical findings
+- **Rule Effectiveness**: Unused rules, low-performing rules, ordering optimization
+- **False Positive Analysis**: Identify legitimate traffic being blocked
+- **Threat Intelligence**: Primary attack vectors, bot traffic, persistent threats
+- **Geographic Assessment**: High-risk countries and geo-blocking strategy
+- **Compliance Review**: OWASP Top 10, PCI-DSS 6.6, AWS Well-Architected
+- **Cost Optimization**: WCU reduction opportunities
+- **Implementation Roadmap**: Prioritized action plan
 
-**Usage**:
-1. Run the analyzer (report generation automatically exports a filled prompt under `exported-prompt/{alias}_{account_id}/`)
-2. Open the exported markdown file and review the injected JSON blocks
-3. Submit to your preferred LLM (Claude, GPT-4, etc.)
-4. Review and validate recommendations
-5. Populate the "LLM Recommendations" sheet in Excel
+**Usage Options**:
 
-### false_positive_analysis.md
-Identifies patterns in false positives and suggests tuning.
+**Option 1 - Manual (No AWS Bedrock needed)**:
+1. Run the analyzer and select "Export Excel Report + Generate LLM Prompt"
+2. Prompt file auto-generated with all WAF metrics injected at `output/{alias}_{account_id}/waf_analysis_YYYY-MM-DD_llm_prompt.md`
+3. Copy content and paste into ChatGPT/Claude/Gemini
+4. Copy AI response and paste into "LLM Recommendations" sheet in Excel
 
-### rule_optimization.md
-Recommends rule ordering, consolidation, and performance improvements.
+**Option 2 - Auto (AWS Bedrock)**:
+1. Run the analyzer and select "Export Excel Report + Auto-Analyze with LLM"
+2. Choose LLM model (Claude 3.5 Sonnet recommended for accuracy & conciseness)
+3. Analysis runs automatically via AWS Bedrock API
+4. Excel "LLM Recommendations" sheet auto-populated with findings
+5. Cost: ~$1.50-3.00 per analysis
 
-### compliance_gap_analysis.md
-Evaluates compliance with OWASP Top 10, PCI-DSS, and other frameworks.
+**Supported Models** (all via AWS Bedrock):
+- **Claude 3.5 Sonnet** - Recommended for accurate, concise analysis
+- **Claude 3 Haiku** - Fastest & cheapest option
+- **OpenAI GPT-OSS 120B** - Production-grade reasoning
+- **OpenAI GPT-OSS 20B** - Fast analysis
 
 ## Database Schema
 
