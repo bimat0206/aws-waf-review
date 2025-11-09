@@ -862,6 +862,67 @@ def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any
             print("You can use this prompt manually with ChatGPT/Claude")
             return None
 
+        # Generate sheet-specific findings
+        print("\n🔍 Generating sheet-specific analysis findings...")
+        llm_sheet_findings = {}
+
+        try:
+            # Traffic Analysis findings
+            print("  - Analyzing traffic patterns...")
+            llm_sheet_findings['traffic'] = analyzer.analyze_sheet_findings(
+                sheet_type='traffic',
+                metrics=metrics,
+                sheet_data={},
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            # Rule Effectiveness findings
+            print("  - Analyzing rule effectiveness...")
+            llm_sheet_findings['rule_effectiveness'] = analyzer.analyze_sheet_findings(
+                sheet_type='rule_effectiveness',
+                metrics=metrics,
+                sheet_data={},
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            # Geographic findings
+            print("  - Analyzing geographic threats...")
+            llm_sheet_findings['geographic'] = analyzer.analyze_sheet_findings(
+                sheet_type='geographic',
+                metrics=metrics,
+                sheet_data={},
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            # Rule Action findings
+            print("  - Analyzing rule actions...")
+            llm_sheet_findings['rule_action'] = analyzer.analyze_sheet_findings(
+                sheet_type='rule_action',
+                metrics=metrics,
+                sheet_data={},
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            # Client Analysis findings
+            print("  - Analyzing client behavior...")
+            llm_sheet_findings['client'] = analyzer.analyze_sheet_findings(
+                sheet_type='client',
+                metrics=metrics,
+                sheet_data={},
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            print("✓ Sheet-specific findings generated successfully")
+        except Exception as e:
+            logger.warning(f"Error generating sheet-specific findings: {e}")
+            print(f"⚠️  Some sheet findings could not be generated: {e}")
+            # Continue with empty findings
+
         # Export raw LLM response to separate directory
         raw_llm_dir = f"raw-llm-response/{account_identifier}"
         llm_exporter = RawLLMExporter()
@@ -931,7 +992,8 @@ def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any
             rules_by_web_acl,
             session_info,
             llm_analysis=result.get('parsed'),
-            llm_metadata=metadata
+            llm_metadata=metadata,
+            llm_sheet_findings=llm_sheet_findings
         )
 
         print(f"\n✓ Excel report generated: {output_path}")

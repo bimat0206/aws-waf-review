@@ -17,10 +17,14 @@ class RuleActionDistributionSheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any]) -> None:
+    def build(self, metrics: Dict[str, Any], llm_findings: list = None) -> None:
         """
         Create the Rule Action Distribution sheet.
         Analyzes rule actions (BLOCK, ALLOW, CHALLENGE, CAPTCHA) to evaluate rule effectiveness.
+
+        Args:
+            metrics: Dictionary containing calculated metrics
+            llm_findings: Optional list of LLM-generated findings
         """
         logger.info("Creating Rule Action Distribution sheet...")
 
@@ -200,8 +204,8 @@ class RuleActionDistributionSheet(BaseSheet):
                 logger.warning(f"Could not create action distribution chart: {e}")
 
         # Add LLM Findings Section
-        row_for_findings = row + 3 if rule_data else row + 1
-        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Action Analysis Findings", merge_cols='A:G')
+        row_for_findings = row + 3 if rule_effectiveness else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Action Analysis Findings", merge_cols='A:G', findings=llm_findings)
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 40

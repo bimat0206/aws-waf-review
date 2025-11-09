@@ -380,6 +380,57 @@ class ResponseParser:
 
         return roadmap
 
+    def parse_sheet_findings(self, response: str) -> List[Dict[str, Any]]:
+        """
+        Parse sheet-specific findings from LLM response.
+
+        Expects format:
+        FINDING 1:
+        Finding: [description]
+        Severity: [HIGH/MEDIUM/LOW]
+        Recommendation: [recommendation text]
+
+        Args:
+            response: LLM response text
+
+        Returns:
+            List of finding dictionaries
+        """
+        findings = []
+
+        try:
+            # Split by FINDING markers
+            finding_blocks = re.split(r'FINDING \d+:', response)
+
+            for block in finding_blocks[1:]:  # Skip first empty element
+                finding_dict = {}
+
+                # Extract Finding
+                finding_match = re.search(r'Finding:\s*(.+?)(?=Severity:|$)', block, re.DOTALL)
+                if finding_match:
+                    finding_dict['finding'] = finding_match.group(1).strip()
+
+                # Extract Severity
+                severity_match = re.search(r'Severity:\s*(HIGH|MEDIUM|LOW)', block, re.IGNORECASE)
+                if severity_match:
+                    finding_dict['severity'] = severity_match.group(1).upper()
+                else:
+                    finding_dict['severity'] = 'MEDIUM'  # Default
+
+                # Extract Recommendation
+                rec_match = re.search(r'Recommendation:\s*(.+?)(?=FINDING \d+:|$)', block, re.DOTALL)
+                if rec_match:
+                    finding_dict['recommendation'] = rec_match.group(1).strip()
+
+                if finding_dict.get('finding'):
+                    findings.append(finding_dict)
+
+        except Exception as e:
+            logger.error(f"Error parsing sheet findings: {e}")
+
+        logger.info(f"Parsed {len(findings)} sheet findings")
+        return findings
+
     def _empty_response(self) -> Dict[str, Any]:
         """Return empty response structure."""
         return {

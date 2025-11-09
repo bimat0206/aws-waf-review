@@ -17,7 +17,7 @@ class ClientAnalysisSheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any]) -> None:
+    def build(self, metrics: Dict[str, Any], llm_findings: list = None) -> None:
         """
         Create the Client Analysis sheet.
 
@@ -34,6 +34,10 @@ class ClientAnalysisSheet(BaseSheet):
         - First/Last Seen: Time range of activity (useful for identifying ongoing attacks)
         - JA3/JA4 Fingerprints: TLS fingerprinting for bot detection
         - User Agents: Client identification strings (can reveal malicious tools)
+
+        Args:
+            metrics: Dictionary containing calculated metrics
+            llm_findings: Optional list of LLM-generated findings
         """
         logger.info("Creating Client Analysis sheet...")
 
@@ -164,8 +168,8 @@ class ClientAnalysisSheet(BaseSheet):
                 logger.warning(f"Could not create hourly pattern chart: {e}")
 
         # Add LLM Findings Section
-        row_for_findings = row + 3 if top_clients else row + 1
-        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Client Behavior Analysis Findings", merge_cols='A:F')
+        row_for_findings = row + 3 if top_ips else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Client Behavior Analysis Findings", merge_cols='A:F', findings=llm_findings)
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 50

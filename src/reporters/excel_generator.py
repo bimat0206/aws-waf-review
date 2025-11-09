@@ -53,22 +53,44 @@ class ExcelReportGenerator:
         account_info: Optional[Dict[str, Any]] = None,
         llm_analysis: Optional[Dict[str, Any]] = None,
         llm_metadata: Optional[Dict[str, Any]] = None,
+        llm_sheet_findings: Optional[Dict[str, List]] = None,
     ) -> None:
-        """Generate the complete Excel report."""
+        """
+        Generate the complete Excel report.
+
+        Args:
+            metrics: Calculated metrics from WAF logs
+            web_acls: Web ACL configurations
+            resources: Protected resources
+            logging_configs: Logging configurations
+            rules_by_web_acl: Rules organized by Web ACL
+            account_info: AWS account information
+            llm_analysis: Comprehensive LLM analysis results
+            llm_metadata: LLM metadata (model, tokens, cost, etc.)
+            llm_sheet_findings: Sheet-specific LLM findings dict with keys:
+                - 'traffic': Traffic analysis findings
+                - 'rule_effectiveness': Rule effectiveness findings
+                - 'geographic': Geographic threat findings
+                - 'rule_action': Rule action findings
+                - 'client': Client behavior findings
+        """
         logger.info("Generating Excel report...")
 
         if rules_by_web_acl is None:
             rules_by_web_acl = {}
 
+        if llm_sheet_findings is None:
+            llm_sheet_findings = {}
+
         self._init_sheet(ExecutiveSummarySheet).build(metrics, web_acls, account_info)
         self._init_sheet(InventorySheet).build(
             web_acls, resources, logging_configs, rules_by_web_acl
         )
-        self._init_sheet(TrafficAnalysisSheet).build(metrics)
-        self._init_sheet(RuleEffectivenessSheet).build(metrics)
-        self._init_sheet(GeographicBlockedTrafficSheet).build(metrics)
-        self._init_sheet(RuleActionDistributionSheet).build(metrics)
-        self._init_sheet(ClientAnalysisSheet).build(metrics)
+        self._init_sheet(TrafficAnalysisSheet).build(metrics, llm_findings=llm_sheet_findings.get('traffic'))
+        self._init_sheet(RuleEffectivenessSheet).build(metrics, llm_findings=llm_sheet_findings.get('rule_effectiveness'))
+        self._init_sheet(GeographicBlockedTrafficSheet).build(metrics, llm_findings=llm_sheet_findings.get('geographic'))
+        self._init_sheet(RuleActionDistributionSheet).build(metrics, llm_findings=llm_sheet_findings.get('rule_action'))
+        self._init_sheet(ClientAnalysisSheet).build(metrics, llm_findings=llm_sheet_findings.get('client'))
         self._init_sheet(LLMRecommendationsSheet).build(llm_analysis, llm_metadata)
 
         self.save()

@@ -17,7 +17,7 @@ class RuleEffectivenessSheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any]) -> None:
+    def build(self, metrics: Dict[str, Any], llm_findings: list = None) -> None:
         """
         Create the Rule Effectiveness sheet.
 
@@ -36,6 +36,10 @@ class RuleEffectivenessSheet(BaseSheet):
         - Block Rate %: Percentage of rule hits that resulted in blocks
           - Green (>0%): Rule is actively blocking threats
           - Red (0%): Rule never blocks (may need review)
+
+        Args:
+            metrics: Dictionary containing calculated metrics
+            llm_findings: Optional list of LLM-generated findings
         """
         logger.info("Creating Rule Effectiveness sheet...")
 
@@ -135,7 +139,7 @@ class RuleEffectivenessSheet(BaseSheet):
 
         # Add LLM Findings Section
         row_for_findings = row + 3 if rule_data else row + 1
-        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Effectiveness Findings", merge_cols='A:G')
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Effectiveness Findings", merge_cols='A:G', findings=llm_findings)
 
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 50

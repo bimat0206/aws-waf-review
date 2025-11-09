@@ -17,7 +17,7 @@ class TrafficAnalysisSheet(BaseSheet):
         super().__init__()
         self.workbook = workbook
 
-    def build(self, metrics: Dict[str, Any]) -> None:
+    def build(self, metrics: Dict[str, Any], llm_findings: list = None) -> None:
         """
         Create the Traffic Analysis sheet.
 
@@ -32,6 +32,10 @@ class TrafficAnalysisSheet(BaseSheet):
         - Blocked: Requests blocked by WAF rules
         - Allowed: Requests allowed through WAF
         - Threat Score: Percentage of requests blocked (higher = more threats)
+
+        Args:
+            metrics: Dictionary containing calculated metrics
+            llm_findings: Optional list of LLM-generated findings
         """
         logger.info("Creating Traffic Analysis sheet...")
 
@@ -149,7 +153,7 @@ class TrafficAnalysisSheet(BaseSheet):
         else:
             row_for_findings = row + 1
 
-        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Traffic Analysis Findings")
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Traffic Analysis Findings", findings=llm_findings)
 
         # Auto-adjust columns
         for col in ['A', 'B', 'C', 'D', 'E']:
