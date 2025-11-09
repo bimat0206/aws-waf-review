@@ -13,7 +13,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 try:
     import coloredlogs
 except ImportError:  # pragma: no cover - optional dependency
@@ -28,6 +28,10 @@ from processors.metrics_calculator import MetricsCalculator
 from reporters.excel_generator import ExcelReportGenerator
 from reporters.prompt_exporter import PromptExporter
 from reporters.raw_logs_exporter import RawLogsExporter
+from reporters.raw_llm_exporter import RawLLMExporter
+from llm.analyzer import LLMAnalyzer
+from llm.prompt_injector import PromptInjector
+from llm.response_parser import ResponseParser
 from utils.aws_helpers import (
     verify_aws_credentials,
     get_session_info,
@@ -42,6 +46,14 @@ from utils.time_helpers import (
     get_past_week_window,
     get_custom_window
 )
+from utils.model_config import (
+    get_available_models,
+    get_default_model,
+    get_regional_prefix
+)
+
+# Global timezone configuration (default: UTC+7)
+TIMEZONE_OFFSET = '+07:00'  # Default timezone
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -56,6 +68,48 @@ else:
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     logger.warning("coloredlogs not installed; falling back to basic logging formatting")
+
+
+def get_timezone() -> str:
+    """
+    Get the current timezone offset.
+
+    Returns:
+        str: Timezone offset (e.g., '+07:00', '+00:00', '-05:00')
+    """
+    return TIMEZONE_OFFSET
+
+
+def set_timezone(offset: str) -> None:
+    """
+    Set the timezone offset for report generation.
+
+    Args:
+        offset (str): Timezone offset (e.g., '+07:00', '+00:00', '-05:00')
+    """
+    global TIMEZONE_OFFSET
+    TIMEZONE_OFFSET = offset
+    logger.info(f"Timezone set to UTC{offset}")
+
+
+def get_timezone_display() -> str:
+    """
+    Get display-friendly timezone name.
+
+    Returns:
+        str: Timezone display name (e.g., 'UTC+7', 'UTC', 'UTC-5')
+    """
+    offset = TIMEZONE_OFFSET
+    if offset == '+00:00':
+        return 'UTC'
+    elif offset.startswith('+'):
+        # Remove leading '+' and trailing ':00' for display
+        hours = offset[1:].split(':')[0].lstrip('0') or '0'
+        return f'UTC+{hours}'
+    else:
+        # Negative offset
+        hours = offset[1:].split(':')[0].lstrip('0') or '0'
+        return f'UTC-{hours}'
 
 
 def get_account_identifier(account_id: Optional[str], account_alias: Optional[str] = None) -> str:
@@ -505,7 +559,7 @@ def fetch_logs_from_s3(db_manager: DuckDBManager, bucket: str, prefix: str,
     logger.info(f"Successfully stored {len(parsed_logs)} log entries")
 
 
-def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_web_acl_ids: Optional[List[str]] = None):
+def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_web_acl_ids: Optional[List[str]] = None, account_info: Optional[Dict[str, Any]] = None):
     """
     Generate Excel report with visualizations.
 
@@ -513,6 +567,7 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
         db_manager (DuckDBManager): Database manager instance
         output_path (str): Path to save Excel report
         selected_web_acl_ids (Optional[List[str]]): List of Web ACL IDs to include in report. If None, includes all.
+        account_info (Optional[Dict[str, Any]]): AWS account information (account_id, account_alias, region, profile)
     """
     if selected_web_acl_ids:
         logger.info(f"Generating Excel report for {len(selected_web_acl_ids)} Web ACL(s)...")
@@ -569,7 +624,7 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
 
     # Generate Excel report
     generator = ExcelReportGenerator(output_path)
-    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list, rules_by_web_acl)
+    generator.generate_report(metrics, web_acls_list, resources_list, logging_configs_list, rules_by_web_acl, account_info)
 
     logger.info(f"Excel report generated: {output_path}")
 
@@ -597,6 +652,299 @@ def generate_excel_report(db_manager: DuckDBManager, output_path: str, selected_
         logger.warning(f"Failed to export prompts: {e}")
 
 
+def generate_llm_analysis(db_manager: DuckDBManager, session_info: Dict[str, Any], dir_paths: Dict[str, str], account_identifier: str) -> Optional[Dict[str, Any]]:
+    """
+    Generate LLM-powered security analysis and create updated Excel report.
+
+    Args:
+        db_manager: Database manager instance
+        session_info: AWS session information
+        dir_paths: Dictionary of account-specific directory paths
+        account_identifier: Account identifier for naming
+
+    Returns:
+        Optional[Dict[str, Any]]: LLM analysis results or None if failed
+    """
+    print("\n" + "="*80)
+    print("🤖 LLM Security Analysis")
+    print("="*80)
+
+    # Check if we have data
+    stats = db_manager.get_database_stats()
+    if stats.get('web_acls', 0) == 0:
+        print("\n⚠️  No data found in database.")
+        print("Please fetch WAF configurations and logs first (Options 1 & 2)")
+        return None
+
+    # Get AWS region and determine available models
+    aws_region = session_info.get('region', 'us-east-1')
+    regional_prefix = get_regional_prefix(aws_region)
+    available_models = get_available_models(regional_prefix)
+
+    # Select LLM Provider
+    print("\n🔧 Select LLM Provider:")
+    print("1. AWS Bedrock - Claude (Recommended)")
+    print("2. AWS Bedrock - OpenAI")
+    print("0. Cancel")
+
+    provider_choice = input("\nEnter choice (0-2): ").strip()
+
+    if provider_choice == '0':
+        print("❌ LLM analysis cancelled")
+        return None
+    elif provider_choice == '1':
+        provider = 'bedrock'
+
+        # Dynamically display available Claude models for this region
+        print(f"\n🤖 Select Claude Model (Region: {aws_region} - {regional_prefix.upper()}):")
+
+        if not available_models:
+            print("❌ No models available for this region")
+            return None
+
+        # Display menu from config
+        for idx, model_info in enumerate(available_models, 1):
+            name = model_info['name']
+            desc = model_info['description']
+            input_price = model_info['input_price']
+            output_price = model_info['output_price']
+            print(f"{idx}. {name} ({desc} - ${input_price}/${output_price} per 1M tokens)")
+        print("0. Cancel")
+
+        max_choice = len(available_models)
+        model_choice = input(f"\nEnter choice (0-{max_choice}): ").strip()
+
+        if model_choice == '0':
+            print("❌ LLM analysis cancelled")
+            return None
+
+        try:
+            choice_idx = int(model_choice) - 1
+            if 0 <= choice_idx < len(available_models):
+                model = available_models[choice_idx]['id']
+                print(f"✓ Selected: {available_models[choice_idx]['name']}")
+            else:
+                print("❌ Invalid choice")
+                return None
+        except (ValueError, IndexError):
+            print("❌ Invalid choice")
+            return None
+
+    elif provider_choice == '2':
+        provider = 'openai'  # Use OpenAI provider for OpenAI models
+        # Select OpenAI model
+        print("\n🤖 Select OpenAI Model (via Bedrock):")
+        print("1. GPT-OSS 120B (Production - ~$3/$9 per 1M tokens)")
+        print("2. GPT-OSS 20B (Fast & Cheap - ~$0.50/$1.50 per 1M tokens)")
+        print("0. Cancel")
+
+        model_choice = input("\nEnter choice (0-2): ").strip()
+
+        if model_choice == '0':
+            print("❌ LLM analysis cancelled")
+            return None
+        elif model_choice == '1':
+            model = 'openai.gpt-oss-120b-1:0'
+        elif model_choice == '2':
+            model = 'openai.gpt-oss-20b-1:0'
+        else:
+            print("❌ Invalid choice")
+            return None
+    else:
+        print("❌ Invalid choice")
+        return None
+
+    # AWS Profile selection (optional)
+    print("\n🔐 AWS Profile for Bedrock API:")
+    print("Press Enter to use default credentials, or enter profile name:")
+    profile_input = input("Profile name: ").strip()
+    profile = profile_input if profile_input else None
+
+    # Select Web ACL
+    conn = db_manager.get_connection()
+    web_acls = conn.execute("SELECT web_acl_id, name, scope FROM web_acls ORDER BY name").fetchall()
+
+    if not web_acls:
+        print("\n⚠️  No Web ACLs found in database.")
+        return None
+
+    print("\n📋 Select Web ACL to analyze:")
+    print("="*80)
+    for idx, (web_acl_id, name, scope) in enumerate(web_acls, 1):
+        print(f"{idx}. {name} (Scope: {scope})")
+    print(f"{len(web_acls) + 1}. All Web ACLs")
+    print("="*80)
+
+    while True:
+        choice_input = input(f"\nSelect Web ACL (1-{len(web_acls) + 1}): ").strip()
+        try:
+            selection = int(choice_input)
+            if 1 <= selection <= len(web_acls) + 1:
+                break
+            else:
+                print(f"❌ Please enter a number between 1 and {len(web_acls) + 1}")
+        except ValueError:
+            print("❌ Please enter a valid number")
+
+    # Determine which Web ACL(s) to analyze
+    if selection == len(web_acls) + 1:
+        selected_web_acl_ids = None
+        print(f"\n🔍 Analyzing all Web ACLs...")
+    else:
+        selected_web_acl_id = web_acls[selection - 1][0]
+        selected_web_acl_name = web_acls[selection - 1][1]
+        selected_web_acl_ids = [selected_web_acl_id]
+        print(f"\n🔍 Analyzing Web ACL: {selected_web_acl_name}...")
+
+    try:
+        # Calculate metrics
+        print("\n📊 Calculating metrics...")
+        calculator = MetricsCalculator(db_manager, web_acl_ids=selected_web_acl_ids)
+        metrics = calculator.calculate_all_metrics()
+
+        # Get Web ACL and resource data
+        if selected_web_acl_ids:
+            web_acls_data = conn.execute(
+                "SELECT * FROM web_acls WHERE web_acl_id = ?",
+                [selected_web_acl_ids[0]]
+            ).fetchdf().to_dict('records')
+
+            resources_data = conn.execute(
+                "SELECT * FROM resource_associations WHERE web_acl_id = ?",
+                [selected_web_acl_ids[0]]
+            ).fetchdf().to_dict('records')
+        else:
+            web_acls_data = conn.execute("SELECT * FROM web_acls").fetchdf().to_dict('records')
+            resources_data = conn.execute("SELECT * FROM resource_associations").fetchdf().to_dict('records')
+
+        # Initialize LLM Analyzer
+        # Use the AWS region from session info (dynamically detected)
+        aws_region = session_info.get('region', 'us-east-1')
+        print(f"\n🤖 Initializing {provider} provider with model: {model} in region: {aws_region}...")
+        analyzer = LLMAnalyzer(
+            provider=provider,
+            model=model,
+            profile=profile,
+            region=aws_region
+        )
+
+        # Test connection
+        print("🔌 Testing connection to LLM provider...")
+        if not analyzer.test_provider_connection():
+            print("❌ Failed to connect to LLM provider")
+            print("Please check your AWS credentials and Bedrock model access")
+            return None
+
+        print("✓ Connection successful")
+
+        # Generate prompt and save it
+        timestamp = format_datetime(datetime.now(), 'filename')
+        prompt_dir = dir_paths.get('exported_prompts', f'exported-prompt/{account_identifier}')
+        prompt_path = f"{prompt_dir}/{account_identifier}_{timestamp}_llm_prompt.txt"
+
+        # Perform analysis
+        print("\n🧠 Sending data to LLM for analysis...")
+        print("⏳ This may take 30-60 seconds depending on the model...")
+
+        result = analyzer.analyze_waf_security(
+            metrics=metrics,
+            web_acls=web_acls_data,
+            resources=resources_data,
+            account_info=session_info,
+            save_prompt=prompt_path,
+            temperature=0.3,
+            max_tokens=16000
+        )
+
+        if result.get('error'):
+            print(f"\n❌ LLM analysis failed: {result['error']}")
+            print(f"✓ Prompt saved to: {prompt_path}")
+            print("You can use this prompt manually with ChatGPT/Claude")
+            return None
+
+        # Export raw LLM response to separate directory
+        raw_llm_dir = f"raw-llm-response/{account_identifier}"
+        llm_exporter = RawLLMExporter()
+
+        # Get Web ACL name for filename (if analyzing single Web ACL)
+        web_acl_name = None
+        if selected_web_acl_ids and len(selected_web_acl_ids) == 1:
+            web_acl_name = web_acls_data[0].get('name') if web_acls_data else None
+
+        raw_response_path = llm_exporter.export_full_analysis(
+            analysis_result=result,
+            output_dir=raw_llm_dir,
+            account_identifier=account_identifier,
+            web_acl_name=web_acl_name
+        )
+
+        # Display analysis metadata
+        metadata = result.get('metadata', {})
+        print("\n" + "="*80)
+        print("✓ LLM Analysis Complete!")
+        print("="*80)
+        print(f"Provider: {metadata.get('provider', 'N/A')}")
+        print(f"Model: {metadata.get('model', 'N/A')}")
+        print(f"Tokens Used: {metadata.get('tokens_used', {}).get('total', 0):,}")
+        print(f"Estimated Cost: ${metadata.get('cost_estimate', 0):.4f}")
+        print(f"Duration: {metadata.get('duration', 0):.2f}s")
+        print(f"Prompt saved to: {prompt_path}")
+        if raw_response_path:
+            print(f"Raw LLM response saved to: {raw_response_path}")
+        print("="*80)
+
+        # Generate Excel report with LLM recommendations
+        print("\n📊 Generating Excel report with LLM recommendations...")
+        output_path = f"output/{account_identifier}_{timestamp}_waf_report_with_llm.xlsx"
+
+        # Get all the data needed for Excel report
+        conn = db_manager.get_connection()
+
+        # Filter based on selection
+        if selected_web_acl_ids:
+            escaped_ids = [id.replace("'", "''") for id in selected_web_acl_ids]
+            ids_str = "', '".join(escaped_ids)
+            web_acl_filter = f"WHERE web_acl_id IN ('{ids_str}')"
+        else:
+            web_acl_filter = ""
+
+        web_acls_list = conn.execute(f"SELECT * FROM web_acls {web_acl_filter}").fetchdf().to_dict('records')
+        resources_list = conn.execute(f"SELECT * FROM resource_associations {web_acl_filter}").fetchdf().to_dict('records')
+        logging_configs_list = conn.execute(f"SELECT * FROM logging_configurations {web_acl_filter}").fetchdf().to_dict('records')
+        rules_list = conn.execute(f"SELECT * FROM rules {web_acl_filter}").fetchdf().to_dict('records')
+
+        # Group rules by Web ACL
+        rules_by_web_acl = {}
+        for rule in rules_list:
+            web_acl_id = rule.get('web_acl_id')
+            if web_acl_id not in rules_by_web_acl:
+                rules_by_web_acl[web_acl_id] = []
+            rules_by_web_acl[web_acl_id].append(rule)
+
+        # Create report with LLM analysis
+        generator = ExcelReportGenerator(output_path)
+        generator.generate_report(
+            metrics,
+            web_acls_list,
+            resources_list,
+            logging_configs_list,
+            rules_by_web_acl,
+            session_info,
+            llm_analysis=result.get('parsed'),
+            llm_metadata=metadata
+        )
+
+        print(f"\n✓ Excel report generated: {output_path}")
+        print("\nThe 'LLM Recommendations' sheet has been populated with AI-generated insights!")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error during LLM analysis: {e}", exc_info=True)
+        print(f"\n❌ Error: {e}")
+        return None
+
+
 def interactive_menu(db_manager: DuckDBManager):
     """
     Display interactive menu for user actions.
@@ -615,11 +963,76 @@ def interactive_menu(db_manager: DuckDBManager):
     print("3. View Current Inventory (Web ACLs and Resources)")
     print("4. Generate Excel Report")
     print("5. View Database Statistics")
+    print("6. Configure Timezone Settings")
+    print("7. Generate LLM Security Analysis (Auto-populate Recommendations)")
     print("0. Exit")
     print("="*80)
+    print(f"Current Timezone: {get_timezone_display()}")
+    print("="*80)
 
-    choice = input("\nEnter your choice (0-5): ").strip()
+    choice = input("\nEnter your choice (0-7): ").strip()
     return choice
+
+
+def configure_timezone():
+    """
+    Interactive timezone configuration.
+    """
+    print("\n" + "="*80)
+    print("⏰ Timezone Configuration")
+    print("="*80)
+    print(f"Current Timezone: {get_timezone_display()}")
+    print("\nSelect a timezone option:")
+    print("1. UTC (GMT+0)")
+    print("2. UTC+7 (Bangkok, Jakarta, Ho Chi Minh)")
+    print("3. UTC+8 (Singapore, Hong Kong, Beijing)")
+    print("4. UTC+9 (Tokyo, Seoul)")
+    print("5. UTC-5 (US Eastern)")
+    print("6. UTC-8 (US Pacific)")
+    print("7. Custom timezone")
+    print("0. Cancel")
+    print("="*80)
+
+    choice = input("\nEnter your choice (0-7): ").strip()
+
+    timezone_map = {
+        '1': '+00:00',
+        '2': '+07:00',
+        '3': '+08:00',
+        '4': '+09:00',
+        '5': '-05:00',
+        '6': '-08:00',
+    }
+
+    if choice == '0':
+        print("❌ Timezone configuration cancelled")
+        return
+    elif choice in timezone_map:
+        offset = timezone_map[choice]
+        set_timezone(offset)
+        print(f"✓ Timezone updated to {get_timezone_display()}")
+    elif choice == '7':
+        print("\nEnter custom timezone offset:")
+        print("Format: +HH:MM or -HH:MM")
+        print("Examples: +05:30 (India), -03:00 (Brazil), +10:00 (Australia East)")
+        custom_offset = input("Offset: ").strip()
+
+        # Validate format
+        if len(custom_offset) == 6 and custom_offset[0] in ['+', '-'] and custom_offset[3] == ':':
+            try:
+                hours = int(custom_offset[1:3])
+                minutes = int(custom_offset[4:6])
+                if 0 <= hours <= 14 and 0 <= minutes <= 59:
+                    set_timezone(custom_offset)
+                    print(f"✓ Timezone updated to {get_timezone_display()}")
+                else:
+                    print("❌ Invalid offset range. Hours: 0-14, Minutes: 0-59")
+            except ValueError:
+                print("❌ Invalid format. Please use +HH:MM or -HH:MM")
+        else:
+            print("❌ Invalid format. Please use +HH:MM or -HH:MM")
+    else:
+        print("❌ Invalid choice")
 
 
 def get_cloudwatch_log_groups_from_db(db_manager: DuckDBManager):
@@ -782,6 +1195,7 @@ def main():
 
     # Get AWS account info for directory organization
     session_info = get_session_info()
+    session_info['timezone'] = get_timezone_display()  # Add timezone information
     account_id = session_info.get('account_id')
     account_alias = session_info.get('account_alias')
 
@@ -802,6 +1216,10 @@ def main():
     db_manager.initialize_database()
 
     try:
+        # Run database migration to fix any existing log entries with ARN format
+        logger.info("Running database migration for Web ACL ID format...")
+        db_manager.migrate_web_acl_ids()
+        
         # Interactive mode: Menu-driven workflow
         if interactive_mode:
             while True:
@@ -967,7 +1385,7 @@ def main():
                         selected_web_acl_ids = [selected_web_acl_id]
                         print(f"\n📊 Generating report for Web ACL: {selected_web_acl_name}...")
 
-                    generate_excel_report(db_manager, output_path, selected_web_acl_ids)
+                    generate_excel_report(db_manager, output_path, selected_web_acl_ids, session_info)
 
                     print(f"\n✓ Excel report generated: {output_path}")
                     print("\nNext steps:")
@@ -985,11 +1403,23 @@ def main():
                         print(f"{table:30s}: {count:>10,} records")
                     print("="*80)
 
+                elif choice == '6':
+                    # Configure Timezone
+                    configure_timezone()
+
+                elif choice == '7':
+                    # Generate LLM Security Analysis
+                    generate_llm_analysis(db_manager, session_info, dir_paths, account_identifier)
+
                 else:
-                    print("❌ Invalid choice. Please enter 0-5.")
+                    print("❌ Invalid choice. Please enter 0-7.")
 
         # Non-interactive mode: Traditional CLI workflow
         else:
+            # Run database migration to fix any existing log entries with ARN format
+            logger.info("Running database migration for Web ACL ID format...")
+            db_manager.migrate_web_acl_ids()
+            
             # Fetch WAF configurations
             if not args.skip_config:
                 scope = args.scope or 'REGIONAL'
@@ -1054,7 +1484,7 @@ def main():
                 timestamp = format_datetime(datetime.now(), 'filename')
                 output_path = f"output/{account_identifier}_{timestamp}_waf_report.xlsx"
 
-            generate_excel_report(db_manager, output_path)
+            generate_excel_report(db_manager, output_path, None, session_info)
 
             # Show summary
             print("\n" + "="*60)

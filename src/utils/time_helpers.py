@@ -153,13 +153,15 @@ def get_hourly_buckets(start_time: datetime, end_time: datetime) -> list:
     Returns:
         list: List of datetime objects representing each hour
     """
-    buckets = []
-    current = start_time.replace(minute=0, second=0, microsecond=0)
-
-    while current <= end_time:
-        buckets.append(current)
-        current += timedelta(hours=1)
-
+    # Normalize to start of the hour
+    start_hour = start_time.replace(minute=0, second=0, microsecond=0)
+    end_hour = end_time.replace(minute=0, second=0, microsecond=0)
+    
+    # Calculate the total number of hours to avoid looping
+    total_hours = int((end_hour - start_hour).total_seconds() / 3600) + 1
+    
+    buckets = [start_hour + timedelta(hours=i) for i in range(total_hours)]
+    
     logger.debug(f"Generated {len(buckets)} hourly buckets")
     return buckets
 
@@ -175,13 +177,15 @@ def get_daily_buckets(start_time: datetime, end_time: datetime) -> list:
     Returns:
         list: List of datetime objects representing each day
     """
-    buckets = []
-    current = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    while current <= end_time:
-        buckets.append(current)
-        current += timedelta(days=1)
-
+    # Normalize to start of the day
+    start_day = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_day = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Calculate the total number of days to avoid looping
+    total_days = (end_day - start_day).days + 1
+    
+    buckets = [start_day + timedelta(days=i) for i in range(total_days)]
+    
     logger.debug(f"Generated {len(buckets)} daily buckets")
     return buckets
 

@@ -8,41 +8,6 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
 ### Current Rule Configuration
 ```json
 {
-  "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8": [
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesAmazonIpReputationList",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesAmazonIpReputationList",
-      "priority": 0,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesAmazonIpReputationList\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesAmazonIpReputationList\"}}",
-      "override_action": "2025-11-07 13:29:14.000968"
-    },
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesCommonRuleSet",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesCommonRuleSet",
-      "priority": 1,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesCommonRuleSet\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesCommonRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:14.002242"
-    },
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesKnownBadInputsRuleSet",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
-      "priority": 2,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesKnownBadInputsRuleSet\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesKnownBadInputsRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:14.002945"
-    }
-  ],
   "f2333cee-5181-470d-b66e-54cec66025ca": [
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_renova-office",
@@ -53,7 +18,7 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
       "action": "{\"Allow\": {}}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"renova-office\"}",
       "visibility_config": "{\"IPSetReferenceStatement\": {\"ARN\": \"arn:aws:wafv2:us-east-1:879654127886:global/ipset/CreatedByCloudFront-60550345_renova-office_IPV4/eed3325b-7d2f-41aa-926e-c35595cc7447\"}}",
-      "override_action": "2025-11-07 13:29:22.661854"
+      "override_action": "2025-11-08 03:09:34.082405"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesAmazonIpReputationList",
@@ -64,7 +29,7 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesAmazonIpReputationList\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesAmazonIpReputationList\"}}",
-      "override_action": "2025-11-07 13:29:22.663184"
+      "override_action": "2025-11-08 03:09:34.083580"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesCommonRuleSet",
@@ -75,7 +40,7 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesCommonRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesCommonRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.664711"
+      "override_action": "2025-11-08 03:09:34.084549"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesKnownBadInputsRuleSet",
@@ -86,7 +51,7 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesKnownBadInputsRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesKnownBadInputsRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.665751"
+      "override_action": "2025-11-08 03:09:34.085513"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesSQLiRuleSet",
@@ -97,7 +62,7 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesSQLiRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesSQLiRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.666465"
+      "override_action": "2025-11-08 03:09:34.086989"
     }
   ]
 }
@@ -114,8 +79,19 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
     "blocks": 0,
     "allows": 157,
     "counts": 0,
-    "hit_rate_percent": 100.0,
+    "hit_rate_percent": 98.74,
     "block_rate_percent": 0.0
+  },
+  {
+    "rule_id": "Default_Action",
+    "rule_type": "REGULAR",
+    "hit_count": 2,
+    "unique_ips": 1,
+    "blocks": 2,
+    "allows": 0,
+    "counts": 0,
+    "hit_rate_percent": 1.26,
+    "block_rate_percent": 100.0
   }
 ]
 ```
@@ -125,11 +101,11 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
 [
   {
     "country": "VN",
-    "total_requests": 157,
-    "blocked_requests": 0,
+    "total_requests": 159,
+    "blocked_requests": 2,
     "allowed_requests": 157,
-    "unique_ips": 1,
-    "threat_score": 0.0
+    "unique_ips": 2,
+    "threat_score": 1.26
   }
 ]
 ```
@@ -137,12 +113,9 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
 ### Cost Analysis
 ```json
 {
-  "total_rules": 8,
-  "estimated_capacity_wcu": 2051,
+  "total_rules": 5,
+  "estimated_capacity_wcu": 1126,
   "managed_rule_groups": [
-    "AWS-AWSManagedRulesAmazonIpReputationList",
-    "AWS-AWSManagedRulesCommonRuleSet",
-    "AWS-AWSManagedRulesKnownBadInputsRuleSet",
     "AWS-AWSManagedRulesAmazonIpReputationList",
     "AWS-AWSManagedRulesCommonRuleSet",
     "AWS-AWSManagedRulesKnownBadInputsRuleSet",
@@ -154,7 +127,9 @@ Optimize AWS WAF rules for better performance, cost-efficiency, and security eff
 
 ### Attack Pattern Analysis
 ```json
-null
+{
+  "Other": 2
+}
 ```
 
 ## Analysis Requirements
@@ -262,41 +237,6 @@ For each optimization:
 **Before Configuration**:
 ```json
 {
-  "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8": [
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesAmazonIpReputationList",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesAmazonIpReputationList",
-      "priority": 0,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesAmazonIpReputationList\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesAmazonIpReputationList\"}}",
-      "override_action": "2025-11-07 13:29:14.000968"
-    },
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesCommonRuleSet",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesCommonRuleSet",
-      "priority": 1,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesCommonRuleSet\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesCommonRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:14.002242"
-    },
-    {
-      "rule_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8_AWS-AWSManagedRulesKnownBadInputsRuleSet",
-      "web_acl_id": "30cb8a2e-5e83-4b03-b80f-6a0d4cc4b2f8",
-      "name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
-      "priority": 2,
-      "rule_type": "MANAGED_RULE_GROUP",
-      "action": "{}",
-      "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesKnownBadInputsRuleSet\"}",
-      "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesKnownBadInputsRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:14.002945"
-    }
-  ],
   "f2333cee-5181-470d-b66e-54cec66025ca": [
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_renova-office",
@@ -307,7 +247,7 @@ For each optimization:
       "action": "{\"Allow\": {}}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"renova-office\"}",
       "visibility_config": "{\"IPSetReferenceStatement\": {\"ARN\": \"arn:aws:wafv2:us-east-1:879654127886:global/ipset/CreatedByCloudFront-60550345_renova-office_IPV4/eed3325b-7d2f-41aa-926e-c35595cc7447\"}}",
-      "override_action": "2025-11-07 13:29:22.661854"
+      "override_action": "2025-11-08 03:09:34.082405"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesAmazonIpReputationList",
@@ -318,7 +258,7 @@ For each optimization:
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesAmazonIpReputationList\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesAmazonIpReputationList\"}}",
-      "override_action": "2025-11-07 13:29:22.663184"
+      "override_action": "2025-11-08 03:09:34.083580"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesCommonRuleSet",
@@ -329,7 +269,7 @@ For each optimization:
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesCommonRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesCommonRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.664711"
+      "override_action": "2025-11-08 03:09:34.084549"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesKnownBadInputsRuleSet",
@@ -340,7 +280,7 @@ For each optimization:
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesKnownBadInputsRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesKnownBadInputsRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.665751"
+      "override_action": "2025-11-08 03:09:34.085513"
     },
     {
       "rule_id": "f2333cee-5181-470d-b66e-54cec66025ca_AWS-AWSManagedRulesSQLiRuleSet",
@@ -351,7 +291,7 @@ For each optimization:
       "action": "{}",
       "statement": "{\"SampledRequestsEnabled\": true, \"CloudWatchMetricsEnabled\": true, \"MetricName\": \"AWS-AWSManagedRulesSQLiRuleSet\"}",
       "visibility_config": "{\"ManagedRuleGroupStatement\": {\"VendorName\": \"AWS\", \"Name\": \"AWSManagedRulesSQLiRuleSet\"}}",
-      "override_action": "2025-11-07 13:29:22.666465"
+      "override_action": "2025-11-08 03:09:34.086989"
     }
   ]
 }
@@ -366,6 +306,12 @@ For each optimization:
       "suggested_priority": 1,
       "hit_count": 157,
       "block_rate_percent": 0.0
+    },
+    {
+      "rule": "Default_Action",
+      "suggested_priority": 2,
+      "hit_count": 2,
+      "block_rate_percent": 100.0
     }
   ]
 }

@@ -14,6 +14,7 @@ from pathlib import Path
 from botocore.exceptions import ClientError
 from tqdm import tqdm
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils.aws_helpers import get_s3_client, handle_aws_error
 from utils.time_helpers import get_s3_prefix_for_date, get_daily_buckets
@@ -246,7 +247,7 @@ class S3Fetcher:
         return inner
 
     def fetch_logs(self, bucket: str, prefix: str, start_time: datetime,
-                  end_time: datetime) -> List[Dict[str, Any]]:
+                  end_time: datetime, max_workers: int = 5) -> List[Dict[str, Any]]:
         """
         Fetch all WAF logs from S3 for a given time range.
 
@@ -255,6 +256,7 @@ class S3Fetcher:
             prefix (str): Base prefix for WAF logs
             start_time (datetime): Start of time range
             end_time (datetime): End of time range
+            max_workers (int): Maximum number of parallel download workers
 
         Returns:
             List[Dict[str, Any]]: All parsed log entries
@@ -262,28 +264,41 @@ class S3Fetcher:
         logger.info(f"Fetching WAF logs from s3://{bucket}/{prefix}")
         logger.info(f"Time range: {start_time.date()} to {end_time.date()}")
 
-        all_log_entries = []
-
         # Generate date-based prefixes
         date_prefixes = self._generate_date_prefixes(prefix, start_time, end_time)
 
         logger.info(f"Scanning {len(date_prefixes)} date-based prefixes")
 
-        # Process each date prefix
-        for date_prefix in tqdm(date_prefixes, desc="Processing S3 prefixes"):
-            # List objects for this prefix
+        # Collect all objects to process
+        all_objects = []
+        for date_prefix in date_prefixes:
             objects = self.list_objects(bucket, date_prefix, start_time, end_time)
+            for obj in objects:
+                if self._is_log_file(obj['Key']):
+                    all_objects.append(obj)
 
-            # Read each log file
-            for obj in tqdm(objects, desc=f"Reading {date_prefix}", leave=False):
-                key = obj['Key']
+        logger.info(f"Found {len(all_objects)} log files to process")
 
-                # Skip non-log files
-                if not self._is_log_file(key):
-                    continue
+        # Process files in parallel
+        all_log_entries = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit tasks
+            future_to_key = {
+                executor.submit(self.read_log_file, bucket, obj['Key']): obj['Key'] 
+                for obj in all_objects
+            }
 
-                log_entries = self.read_log_file(bucket, key)
-                all_log_entries.extend(log_entries)
+            # Collect results with progress bar
+            with tqdm(total=len(all_objects), desc="Processing S3 log files") as pbar:
+                for future in as_completed(future_to_key):
+                    key = future_to_key[future]
+                    try:
+                        log_entries = future.result()
+                        all_log_entries.extend(log_entries)
+                    except Exception as e:
+                        logger.error(f"Error processing {key}: {e}")
+                    finally:
+                        pbar.update(1)
 
         logger.info(f"Fetched {len(all_log_entries)} total log entries from S3")
         return all_log_entries

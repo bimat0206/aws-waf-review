@@ -50,6 +50,9 @@ class ExcelReportGenerator:
         resources: List[Dict[str, Any]],
         logging_configs: List[Dict[str, Any]],
         rules_by_web_acl: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        account_info: Optional[Dict[str, Any]] = None,
+        llm_analysis: Optional[Dict[str, Any]] = None,
+        llm_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Generate the complete Excel report."""
         logger.info("Generating Excel report...")
@@ -57,7 +60,7 @@ class ExcelReportGenerator:
         if rules_by_web_acl is None:
             rules_by_web_acl = {}
 
-        self._init_sheet(ExecutiveSummarySheet).build(metrics, web_acls)
+        self._init_sheet(ExecutiveSummarySheet).build(metrics, web_acls, account_info)
         self._init_sheet(InventorySheet).build(
             web_acls, resources, logging_configs, rules_by_web_acl
         )
@@ -66,7 +69,7 @@ class ExcelReportGenerator:
         self._init_sheet(GeographicBlockedTrafficSheet).build(metrics)
         self._init_sheet(RuleActionDistributionSheet).build(metrics)
         self._init_sheet(ClientAnalysisSheet).build(metrics)
-        self._init_sheet(LLMRecommendationsSheet).build()
+        self._init_sheet(LLMRecommendationsSheet).build(llm_analysis, llm_metadata)
 
         self.save()
 

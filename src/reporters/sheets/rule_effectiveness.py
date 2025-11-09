@@ -20,6 +20,22 @@ class RuleEffectivenessSheet(BaseSheet):
     def build(self, metrics: Dict[str, Any]) -> None:
         """
         Create the Rule Effectiveness sheet.
+
+        This sheet evaluates the performance and effectiveness of WAF rules, including:
+        - Rule hit counts and frequency
+        - Block vs. Allow ratios per rule
+        - Rule types (REGULAR, MANAGED, RATE_BASED)
+        - Attack type distribution based on rules triggered
+        - Visual charts showing rule performance
+
+        Metrics explained:
+        - Hit Count: Total number of times the rule was triggered
+        - Blocks: Number of requests blocked by this rule
+        - Allows: Number of requests allowed by this rule
+        - Hit Rate %: Percentage of total requests that triggered this rule
+        - Block Rate %: Percentage of rule hits that resulted in blocks
+          - Green (>0%): Rule is actively blocking threats
+          - Red (0%): Rule never blocks (may need review)
         """
         logger.info("Creating Rule Effectiveness sheet...")
 
@@ -37,7 +53,14 @@ class RuleEffectivenessSheet(BaseSheet):
         ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
         ws.merge_cells('A2:G2')
 
-        row = 4
+        # Description
+        ws['A3'] = 'Analyzes WAF rule performance to identify effective rules, unused rules, and optimization opportunities.'
+        ws['A3'].font = Font(size=10, italic=True, color='606060', name='Calibri')
+        ws['A3'].alignment = Alignment(wrap_text=True)
+        ws.merge_cells('A3:G3')
+        ws.row_dimensions[3].height = 30
+
+        row = 5
 
         # Rule effectiveness table
         rule_data = metrics.get('rule_effectiveness', [])
@@ -47,9 +70,9 @@ class RuleEffectivenessSheet(BaseSheet):
             self._format_header_row(ws, row, headers)
             row += 1
 
-            # Data
+            # Prepare data for bulk insertion
+            data_rows = []
             for idx, rule in enumerate(rule_data):
-                highlight = idx % 2 == 0
                 hit_rate = rule.get('hit_rate_percent', 0)
 
                 row_data = [
@@ -61,48 +84,52 @@ class RuleEffectivenessSheet(BaseSheet):
                     f"{hit_rate:.1f}",
                     f"{rule.get('block_rate_percent', 0):.1f}"
                 ]
+                data_rows.append(row_data)
 
-                for col_idx, value in enumerate(row_data, start=1):
-                    cell = ws.cell(row=row, column=col_idx)
-                    self._format_data_cell(cell, value, highlight)
-
-                # Color code hit rate
-                hit_rate_cell = ws.cell(row=row, column=6)
+            # Insert data in bulk with alternating highlighting
+            start_data_row = row
+            self._format_data_rows_bulk(ws, start_data_row, data_rows, start_col=1, alternating_highlight=True)
+            
+            # Apply special formatting for hit rate column (column 6)
+            for idx in range(len(rule_data)):
+                hit_rate = rule_data[idx].get('hit_rate_percent', 0)
+                hit_rate_cell = ws.cell(row=start_data_row + idx, column=6)
                 if hit_rate == 0:
                     hit_rate_cell.fill = self.danger_fill
                     hit_rate_cell.font = Font(bold=True, size=10, color='C00000', name='Calibri')
                 elif hit_rate > 10:
                     hit_rate_cell.fill = self.success_fill
                     hit_rate_cell.font = Font(bold=True, size=10, color='008000', name='Calibri')
+                    
+            row += len(rule_data)
 
-                row += 1
+        # Add charts on the right side
+        chart_col = 'I'  # Start charts at column I (right side, after columns A-G)
+        chart_start_row = 5
 
-            # Add chart
-            row += 2
+        # Rule effectiveness chart
+        rule_data = metrics.get('rule_effectiveness', [])
+        if rule_data:
             try:
                 chart_buffer = self.viz.create_rule_effectiveness_chart(rule_data)
                 img = XLImage(chart_buffer)
-                img.width = 800
-                img.height = 500
-                ws.add_image(img, f'A{row}')
+                img.width = 650
+                img.height = 400
+                ws.add_image(img, f'{chart_col}{chart_start_row}')
             except Exception as e:
                 logger.warning(f"Could not create rule effectiveness chart: {e}")
 
-        # Attack type distribution
+        # Attack type distribution chart
         attack_data = metrics.get('attack_type_distribution', {})
         if attack_data:
-            row += 30
-            ws[f'A{row}'] = 'Attack Type Distribution'
-            ws[f'A{row}'].font = self.subtitle_font
-            ws.merge_cells(f'A{row}:G{row}')
-            row += 2
-
             try:
                 chart_buffer = self.viz.create_attack_type_chart(attack_data)
                 img = XLImage(chart_buffer)
-                img.width = 700
-                img.height = 500
-                ws.add_image(img, f'A{row}')
+                img.width = 650
+                img.height = 400
+                # Position below rule effectiveness chart (approximately 26 rows down)
+                attack_chart_row = chart_start_row + 26
+                ws.add_image(img, f'{chart_col}{attack_chart_row}')
             except Exception as e:
                 logger.warning(f"Could not create attack type chart: {e}")
 
@@ -110,3 +137,8 @@ class RuleEffectivenessSheet(BaseSheet):
         ws.column_dimensions['A'].width = 50
         for col in ['B', 'C', 'D', 'E', 'F', 'G']:
             ws.column_dimensions[col].width = 15
+        ws.column_dimensions['H'].width = 2  # Gap
+        ws.column_dimensions['I'].width = 2
+        ws.column_dimensions['J'].width = 2
+        ws.column_dimensions['K'].width = 2
+        ws.column_dimensions['L'].width = 2

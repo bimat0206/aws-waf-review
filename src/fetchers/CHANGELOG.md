@@ -175,6 +175,11 @@ class CloudWatchFetcher:
 - Very large log files (>100MB) may cause memory spikes
 - No built-in caching of downloaded S3 files
 
+## [1.0.3] - 2025-11-08
+
+### Changed
+- **S3 Fetcher (`s3_fetcher.py`)**: Added parallel processing for S3 log downloads using ThreadPoolExecutor, implemented concurrent downloads with configurable worker count to speed up large dataset fetching, and added progress tracking for multi-threaded operations
+
 ### Future Enhancements
 - [ ] Parallel S3 file downloads
 - [ ] Local caching layer for S3 files

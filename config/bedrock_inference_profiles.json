@@ -1,0 +1,105 @@
+{
+  "description": "AWS Bedrock Inference Profile Configuration",
+  "version": "1.0.0",
+  "regional_prefix_mapping": {
+    "description": "Maps AWS regions to their corresponding inference profile prefixes",
+    "us-east-1": "us",
+    "us-west-2": "us",
+    "eu-west-1": "eu",
+    "eu-central-1": "eu",
+    "ap-southeast-1": "apac",
+    "ap-southeast-2": "apac",
+    "ap-northeast-1": "apac",
+    "ap-south-1": "apac"
+  },
+  "available_models": {
+    "description": "Available Claude models for selection menu",
+    "models": [
+      {
+        "id": "anthropic.claude-sonnet-4-20250514-v1:0",
+        "name": "Claude Sonnet 4",
+        "description": "Latest",
+        "input_price": 3.00,
+        "output_price": 15.00,
+        "available_in": ["us", "eu", "apac", "global"]
+      },
+      {
+        "id": "anthropic.claude-3-7-sonnet-20250219-v1:0",
+        "name": "Claude 3.7 Sonnet",
+        "description": "Enhanced",
+        "input_price": 3.00,
+        "output_price": 15.00,
+        "available_in": ["us", "eu", "apac", "global"]
+      },
+      {
+        "id": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "name": "Claude 3.5 Sonnet v2",
+        "description": "Stable",
+        "input_price": 3.00,
+        "output_price": 15.00,
+        "available_in": ["us", "eu", "apac", "global"]
+      },
+      {
+        "id": "anthropic.claude-3-haiku-20240307-v1:0",
+        "name": "Claude 3 Haiku",
+        "description": "Fast & Cheap",
+        "input_price": 0.25,
+        "output_price": 1.25,
+        "available_in": ["us", "eu", "apac", "global"]
+      },
+      {
+        "id": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "name": "Claude Sonnet 4.5",
+        "description": "Latest & Best (US/EU only)",
+        "input_price": 3.00,
+        "output_price": 15.00,
+        "available_in": ["us", "eu", "global"]
+      }
+    ],
+    "default_model": "anthropic.claude-sonnet-4-20250514-v1:0"
+  },
+  "model_pricing": {
+    "description": "Pricing per 1M tokens (USD) for different inference profile formats",
+    "us": {
+      "us.anthropic.claude-sonnet-4-5-20250929-v1:0": {"input": 3.00, "output": 15.00},
+      "us.anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.00, "output": 15.00},
+      "us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 3.00, "output": 15.00},
+      "us.anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 3.00, "output": 15.00},
+      "us.anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.25, "output": 1.25}
+    },
+    "eu": {
+      "eu.anthropic.claude-sonnet-4-5-20250929-v1:0": {"input": 3.00, "output": 15.00},
+      "eu.anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.00, "output": 15.00},
+      "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 3.00, "output": 15.00},
+      "eu.anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 3.00, "output": 15.00},
+      "eu.anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.25, "output": 1.25}
+    },
+    "apac": {
+      "apac.anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.00, "output": 15.00},
+      "apac.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 3.00, "output": 15.00},
+      "apac.anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 3.00, "output": 15.00},
+      "apac.anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.25, "output": 1.25}
+    },
+    "global": {
+      "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {"input": 3.00, "output": 15.00},
+      "global.anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.00, "output": 15.00},
+      "global.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 3.00, "output": 15.00},
+      "global.anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 3.00, "output": 15.00},
+      "global.anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.25, "output": 1.25}
+    },
+    "direct_model_ids": {
+      "description": "Direct model IDs (deprecated - requires inference profile conversion)",
+      "anthropic.claude-sonnet-4-5-20250929-v1:0": {"input": 3.00, "output": 15.00},
+      "anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.00, "output": 15.00},
+      "anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 3.00, "output": 15.00},
+      "anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 3.00, "output": 15.00},
+      "anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.25, "output": 1.25}
+    }
+  },
+  "fallback_strategy": {
+    "description": "Fallback logic for channel program accounts",
+    "primary": "region-specific",
+    "fallback": "global",
+    "error_patterns": ["channel program", "not available for channel program accounts"]
+  }
+}

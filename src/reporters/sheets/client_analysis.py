@@ -20,6 +20,20 @@ class ClientAnalysisSheet(BaseSheet):
     def build(self, metrics: Dict[str, Any]) -> None:
         """
         Create the Client Analysis sheet.
+
+        This sheet analyzes client behavior and identifies potential threats, including:
+        - Top blocked IP addresses and their activity patterns
+        - Bot traffic analysis using JA3/JA4 fingerprints
+        - User agent analysis to identify automated tools
+        - Hourly traffic patterns to detect anomalies
+        - Temporal analysis of repeat offenders
+
+        Metrics explained:
+        - Block Count: Total blocks for each IP address
+        - Unique Rules Hit: Number of different rules triggered by the IP
+        - First/Last Seen: Time range of activity (useful for identifying ongoing attacks)
+        - JA3/JA4 Fingerprints: TLS fingerprinting for bot detection
+        - User Agents: Client identification strings (can reveal malicious tools)
         """
         logger.info("Creating Client Analysis sheet...")
 
@@ -37,7 +51,14 @@ class ClientAnalysisSheet(BaseSheet):
         ws['A2'].font = Font(size=10, italic=True, color='808080', name='Calibri')
         ws.merge_cells('A2:F2')
 
-        row = 4
+        # Description
+        ws['A3'] = 'Analyzes client behavior, identifies malicious IP addresses, and detects bot traffic to enhance threat detection and response.'
+        ws['A3'].font = Font(size=10, italic=True, color='606060', name='Calibri')
+        ws['A3'].alignment = Alignment(wrap_text=True)
+        ws.merge_cells('A3:F3')
+        ws.row_dimensions[3].height = 30
+
+        row = 5
 
         # Top blocked IPs
         top_ips = metrics.get('top_blocked_ips', [])
@@ -129,16 +150,16 @@ class ClientAnalysisSheet(BaseSheet):
 
                     row += 1
 
-        # Hourly patterns
+        # Hourly patterns chart - positioned on the right side
         hourly_data = metrics.get('hourly_patterns', [])
         if hourly_data:
-            row += 2
             try:
                 chart_buffer = self.viz.create_hourly_pattern_chart(hourly_data)
                 img = XLImage(chart_buffer)
-                img.width = 800
+                img.width = 700
                 img.height = 400
-                ws.add_image(img, f'A{row}')
+                # Place chart starting at column H (right side of the data)
+                ws.add_image(img, 'H5')
             except Exception as e:
                 logger.warning(f"Could not create hourly pattern chart: {e}")
 
@@ -147,3 +168,8 @@ class ClientAnalysisSheet(BaseSheet):
         ws.column_dimensions['B'].width = 20
         for col in ['C', 'D', 'E', 'F']:
             ws.column_dimensions[col].width = 18
+        ws.column_dimensions['G'].width = 2  # Gap
+        ws.column_dimensions['H'].width = 2
+        ws.column_dimensions['I'].width = 2
+        ws.column_dimensions['J'].width = 2
+        ws.column_dimensions['K'].width = 2

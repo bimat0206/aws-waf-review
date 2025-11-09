@@ -21,15 +21,35 @@ Analyze the effectiveness of AWS WAF rules based on 3-6 months of log data. Focu
     "blocks": 0,
     "allows": 157,
     "counts": 0,
-    "hit_rate_percent": 100.0,
+    "hit_rate_percent": 98.74,
     "block_rate_percent": 0.0
+  },
+  {
+    "rule_id": "Default_Action",
+    "rule_type": "REGULAR",
+    "hit_count": 2,
+    "unique_ips": 1,
+    "blocks": 2,
+    "allows": 0,
+    "counts": 0,
+    "hit_rate_percent": 1.26,
+    "block_rate_percent": 100.0
   }
 ]
 ```
 
 ### Top Blocked Requests
 ```json
-null
+[
+  {
+    "ip": "42.117.40.21",
+    "country": "VN",
+    "block_count": 2,
+    "unique_rules_hit": 1,
+    "first_seen": "2025-11-07 20:55:58.357000",
+    "last_seen": "2025-11-07 20:55:58.439000"
+  }
+]
 ```
 
 ### Geographic Threat Distribution
@@ -37,11 +57,11 @@ null
 [
   {
     "country": "VN",
-    "total_requests": 157,
-    "blocked_requests": 0,
+    "total_requests": 159,
+    "blocked_requests": 2,
     "allowed_requests": 157,
-    "unique_ips": 1,
-    "threat_score": 0.0
+    "unique_ips": 2,
+    "threat_score": 1.26
   }
 ]
 ```

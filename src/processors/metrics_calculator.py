@@ -218,7 +218,10 @@ class MetricsCalculator:
         """
         result = conn.execute(query).fetchall()
 
-        total_requests = self.get_summary_metrics()['total_requests']
+        # Get total requests in a single query to avoid multiple full table scans
+        total_query = f"SELECT COUNT(*) as total FROM waf_logs {web_acl_filter}"
+        total_result = conn.execute(total_query).fetchone()
+        total_requests = total_result[0] if total_result else 0
 
         rules = []
         for row in result:
@@ -346,14 +349,18 @@ class MetricsCalculator:
             Dict[str, int]: Attack type counts
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute("""
+        where_clause = "WHERE action = 'BLOCK' AND terminating_rule_id IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND action = 'BLOCK' AND terminating_rule_id IS NOT NULL"
+
+        query = f"""
             SELECT terminating_rule_id, COUNT(*) as count
             FROM waf_logs
-            WHERE action = 'BLOCK' AND terminating_rule_id IS NOT NULL
+            {where_clause}
             GROUP BY terminating_rule_id
             ORDER BY count DESC
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         # Classify attack types based on rule IDs
         attack_types = {
@@ -407,24 +414,28 @@ class MetricsCalculator:
             List[Dict[str, Any]]: Hourly traffic data
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
-        result = conn.execute("""
+        query = f"""
             SELECT
                 EXTRACT(HOUR FROM timestamp) as hour,
                 COUNT(*) as total_requests,
                 SUM(CASE WHEN action = 'BLOCK' THEN 1 ELSE 0 END) as blocked,
+                SUM(CASE WHEN action = 'COUNT' THEN 1 ELSE 0 END) as counted,
                 SUM(CASE WHEN action = 'ALLOW' THEN 1 ELSE 0 END) as allowed
             FROM waf_logs
+            {web_acl_filter}
             GROUP BY hour
             ORDER BY hour
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         hourly_data = []
         for row in result:
             hour = int(row[0])
             total = row[1]
             blocked = row[2]
-            allowed = row[3]
+            allowed = row[4]  # Note: updated index due to added 'counted' column
 
             hourly_data.append({
                 'hour': hour,
@@ -516,32 +527,39 @@ class MetricsCalculator:
             Dict[str, Any]: Bot traffic analysis
         """
         conn = self.db.get_connection()
+        web_acl_filter = self._get_web_acl_filter()
 
         # Requests with JA3 fingerprints
-        result = conn.execute("""
+        where_clause = "WHERE ja3_fingerprint IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND ja3_fingerprint IS NOT NULL"
+        query = f"""
             SELECT COUNT(*) as count
             FROM waf_logs
-            WHERE ja3_fingerprint IS NOT NULL
-        """).fetchone()
+            {where_clause}
+        """
+        result = conn.execute(query).fetchone()
         with_ja3 = result[0] if result else 0
 
         # Requests with JA4 fingerprints
-        result = conn.execute("""
+        where_clause = "WHERE ja4_fingerprint IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND ja4_fingerprint IS NOT NULL"
+        query = f"""
             SELECT COUNT(*) as count
             FROM waf_logs
-            WHERE ja4_fingerprint IS NOT NULL
-        """).fetchone()
+            {where_clause}
+        """
+        result = conn.execute(query).fetchone()
         with_ja4 = result[0] if result else 0
 
         # Top user agents
-        result = conn.execute("""
+        where_clause = "WHERE user_agent IS NOT NULL" if not web_acl_filter else f"{web_acl_filter} AND user_agent IS NOT NULL"
+        query = f"""
             SELECT user_agent, COUNT(*) as count
             FROM waf_logs
-            WHERE user_agent IS NOT NULL
+            {where_clause}
             GROUP BY user_agent
             ORDER BY count DESC
             LIMIT 20
-        """).fetchall()
+        """
+        result = conn.execute(query).fetchall()
 
         top_user_agents = [{'user_agent': row[0], 'count': row[1]} for row in result]
 
