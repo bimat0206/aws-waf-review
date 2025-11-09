@@ -217,7 +217,7 @@ class BaseSheet:
             row += 1
 
         # Template table
-        headers = ['No', 'Finding', 'Severity', 'Recommendation']
+        headers = ['No', 'Finding', 'Severity', 'Rationale']
         self._format_header_row(ws, row, headers)
         row += 1
 
@@ -255,9 +255,9 @@ class BaseSheet:
                 elif severity == 'LOW':
                     cell.fill = self.success_fill  # Green
 
-                # Column 4: Recommendation (wrap text)
+                # Column 4: Rationale (wrap text)
                 cell = ws.cell(row=row, column=4)
-                cell.value = finding.get('recommendation', '')
+                cell.value = finding.get('rationale', finding.get('recommendation', ''))
                 cell.font = self.data_font
                 cell.border = self.thin_border
                 cell.alignment = Alignment(vertical='center', wrap_text=True)

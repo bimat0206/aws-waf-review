@@ -316,14 +316,27 @@ class LLMRecommendationsSheet(BaseSheet):
                 # Format action items as bullet list if it's a list
                 action_items = finding.get('action', finding.get('actions', ''))
                 if isinstance(action_items, list):
-                    action_items_formatted = '\n'.join([f'• {item}' for item in action_items])
+                    # Clean up each item and format as bullets
+                    cleaned_items = []
+                    for item in action_items:
+                        # Remove HTML breaks and extra bullets
+                        cleaned = str(item).replace('<br>', '').replace('<br/>', '').strip()
+                        cleaned = cleaned.lstrip('•').lstrip('-').lstrip('*').strip()
+                        if cleaned:
+                            cleaned_items.append(cleaned)
+                    action_items_formatted = '\n'.join([f'• {item}' for item in cleaned_items])
                 else:
-                    # Try to convert string with newlines to bullet list
-                    if '\n' in str(action_items):
-                        items = [line.strip() for line in str(action_items).split('\n') if line.strip()]
-                        action_items_formatted = '\n'.join([f'• {item}' for item in items])
-                    else:
-                        action_items_formatted = f'• {action_items}' if action_items else ''
+                    # Handle string format - remove HTML breaks and clean up bullets
+                    action_str = str(action_items).replace('<br>', '\n').replace('<br/>', '\n')
+
+                    # Split by newlines and clean each line
+                    items = []
+                    for line in action_str.split('\n'):
+                        cleaned = line.strip().lstrip('•').lstrip('-').lstrip('*').strip()
+                        if cleaned:
+                            items.append(cleaned)
+
+                    action_items_formatted = '\n'.join([f'• {item}' for item in items]) if items else ''
 
                 row_data = [
                     str(idx),  # No column

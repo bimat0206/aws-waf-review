@@ -5,6 +5,44 @@ All notable changes to the AWS WAF Security Analysis Tool will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2025-11-09
+
+### Changed
+
+#### LLM Recommendations Format Improvements
+- **Sheet-Specific Findings**: Changed column header from "Recommendation" to "Rationale" in all LLM-Generated Traffic Analysis Findings sections
+  - Updated all 5 sheet-specific prompt templates to request "Rationale" instead of "Recommendation"
+  - Updated response parser to handle both "Rationale" and "Recommendation" fields for backward compatibility
+  - Modified base_sheet.py to display "Rationale" column in findings tables
+- **LLM Recommendations Sheet**: Improved Action Items formatting
+  - Removed HTML break tags (`<br>`) from action items display
+  - Cleaned up duplicate bullet points (•, -, *) in action items
+  - Action items now display as clean, readable bullet lists in Excel cells
+- **Recommendation Format**: Updated comprehensive prompt template with enhanced guidance
+  - Added detailed example recommendation following best-practice format
+  - Recommendation title, Expected Impact, Action Items, and Rationale now clearly defined
+  - Emphasis on quantified impacts (e.g., "15–20% reduction")
+  - Stronger guidance for evidence-based rationales with specific metrics and dates
+  - Improved tone to match professional security analysis reports
+
+**Example Format**:
+```
+Recommendation: Refine Default_Action Configuration
+Action Items:
+  • Analyze traffic processed by the Default_Action rule (77.91% of triggers, 100% ALLOW)
+  • Consider setting a default Challenge action for high-risk traffic patterns
+Expected Impact: 15–20% reduction in default rule dependency, improving threat detection
+Rationale: The Web ACL's DefaultAction: Allow risks undetected malicious traffic, as evidenced
+           by the 1.1% block rate (9,938 requests) and anomalies like January 27 (6,838 blocks)
+```
+
+**Files Updated**:
+- [src/reporters/sheets/base_sheet.py](src/reporters/sheets/base_sheet.py:220-260) - Changed "Recommendation" to "Rationale" column
+- [src/llm/analyzer.py](src/llm/analyzer.py:256-403) - Updated all 5 sheet-specific prompts to use "Rationale"
+- [src/llm/response_parser.py](src/llm/response_parser.py:383-439) - Added Rationale parsing with backward compatibility
+- [src/reporters/sheets/llm_recommendations.py](src/reporters/sheets/llm_recommendations.py:316-339) - Improved Action Items formatting
+- [config/prompts/comprehensive_waf_analysis.md](config/prompts/comprehensive_waf_analysis.md:157-182,468-511) - Enhanced recommendation format guidance with examples
+
 ## [1.7.0] - 2025-11-09
 
 ### Added

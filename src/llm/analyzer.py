@@ -274,7 +274,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of traffic pattern or anomaly]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action to take]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -300,7 +300,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of rule performance issue or optimization opportunity]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action to improve rule effectiveness]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -326,7 +326,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of geographic threat pattern]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific mitigation strategy]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -365,7 +365,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of action distribution insight]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific configuration adjustment]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...
@@ -391,7 +391,7 @@ Provide 3-5 concise findings in this EXACT format:
 FINDING 1:
 Finding: [Brief description of client behavior pattern]
 Severity: [HIGH/MEDIUM/LOW]
-Recommendation: [Specific action regarding client traffic]
+Rationale: [Evidence from data and reasoning for the finding]
 
 FINDING 2:
 ...

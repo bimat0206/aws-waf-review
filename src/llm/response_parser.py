@@ -388,7 +388,7 @@ class ResponseParser:
         FINDING 1:
         Finding: [description]
         Severity: [HIGH/MEDIUM/LOW]
-        Recommendation: [recommendation text]
+        Rationale: [rationale text]
 
         Args:
             response: LLM response text
@@ -417,10 +417,17 @@ class ResponseParser:
                 else:
                     finding_dict['severity'] = 'MEDIUM'  # Default
 
-                # Extract Recommendation
-                rec_match = re.search(r'Recommendation:\s*(.+?)(?=FINDING \d+:|$)', block, re.DOTALL)
-                if rec_match:
-                    finding_dict['recommendation'] = rec_match.group(1).strip()
+                # Extract Rationale (try both Rationale and Recommendation for backward compatibility)
+                rationale_match = re.search(r'Rationale:\s*(.+?)(?=FINDING \d+:|$)', block, re.DOTALL)
+                if rationale_match:
+                    finding_dict['rationale'] = rationale_match.group(1).strip()
+                    finding_dict['recommendation'] = rationale_match.group(1).strip()  # Backward compatibility
+                else:
+                    # Fallback to old format
+                    rec_match = re.search(r'Recommendation:\s*(.+?)(?=FINDING \d+:|$)', block, re.DOTALL)
+                    if rec_match:
+                        finding_dict['rationale'] = rec_match.group(1).strip()
+                        finding_dict['recommendation'] = rec_match.group(1).strip()
 
                 if finding_dict.get('finding'):
                     findings.append(finding_dict)
