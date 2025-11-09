@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### OpenAI Provider Improvements
+- **Dynamic Region Loading**: Regions now loaded dynamically from `bedrock_inference_profiles.json` instead of hardcoded values
+  - Automatically reads supported regions from config file
+  - Falls back to AWS documented regions if config unavailable
+- **Region Validation**: Added validation for regions that support OpenAI models on AWS Bedrock
+  - Validates selected region against configured supported regions
+  - Displays warning with full list of supported regions if unsupported region detected
+- **Model ID Validation**: Added validation to ensure correct OpenAI model IDs
+  - Valid models: `openai.gpt-oss-120b-1:0`, `openai.gpt-oss-20b-1:0`
+  - Raises error with valid model list if invalid model ID provided
+- **Enhanced Error Messages**: Improved error handling with actionable guidance
+  - ValidationException: Provides direct link to AWS Bedrock console to enable model access
+  - AccessDeniedException: Guides on required IAM permissions (bedrock:InvokeModel)
+  - Clear instructions for troubleshooting model access issues with step-by-step guidance
+- **Configuration Documentation**: Added OpenAI models section to bedrock_inference_profiles.json
+  - Model specifications (id, name, pricing, use cases)
+  - Supported regions list
+  - Access requirements and setup steps
+- **User Interface**: Updated model selection menu with access requirements notice
+  - Direct link to AWS Bedrock model access console
+  - Confirmation messages for selected models
+
+**Common Issue Resolution:**
+If you get "The provided model identifier is invalid" error:
+1. Check that your region supports OpenAI models (regions configured in `config/bedrock_inference_profiles.json`)
+2. Enable model access at: https://console.aws.amazon.com/bedrock/home#/modelaccess
+3. Ensure your IAM role has `bedrock:InvokeModel` permission
+4. Verify the model is available in your selected region
+
+**Files Updated**:
+- [src/llm/providers/openai_provider.py](src/llm/providers/openai_provider.py:30-67,89-98,235-242) - Added dynamic region loading, validation, and enhanced error messages
+- [src/main.py](src/main.py:740-753) - Updated UI with model access requirements
+- [config/bedrock_inference_profiles.json](config/bedrock_inference_profiles.json:105-141) - Added OpenAI models documentation
+
 #### LLM Recommendations Format Improvements
 - **Sheet-Specific Findings**: Changed column header from "Recommendation" to "Rationale" in all LLM-Generated Traffic Analysis Findings sections
   - Updated all 5 sheet-specific prompt templates to request "Rationale" instead of "Recommendation"

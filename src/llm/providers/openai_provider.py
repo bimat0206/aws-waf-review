@@ -7,7 +7,8 @@ Implementation for OpenAI models hosted on AWS Bedrock (gpt-oss-20b, gpt-oss-120
 import json
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
@@ -25,6 +26,45 @@ class OpenAIProvider(BaseLLMProvider):
         'openai.gpt-oss-20b-1:0': {'input': 0.50, 'output': 1.50},  # Estimated
         'openai.gpt-oss-120b-1:0': {'input': 3.00, 'output': 9.00},  # Estimated
     }
+
+    @classmethod
+    def _load_supported_regions(cls) -> List[str]:
+        """
+        Load supported regions from bedrock_inference_profiles.json config.
+
+        Returns:
+            List of AWS regions that support OpenAI models on Bedrock
+        """
+        try:
+            config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'bedrock_inference_profiles.json'
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+
+            # Extract all regions from regional_prefix_mapping
+            regions = list(config.get('regional_prefix_mapping', {}).keys())
+
+            if not regions:
+                # Fallback to default regions from AWS docs
+                logger.warning("No regions found in config, using defaults")
+                return [
+                    'us-east-1', 'us-east-2', 'us-west-2',
+                    'ap-northeast-1', 'ap-south-1', 'ap-southeast-3',
+                    'eu-central-1', 'eu-north-1', 'eu-south-1', 'eu-west-1', 'eu-west-2',
+                    'sa-east-1'
+                ]
+
+            logger.debug(f"Loaded {len(regions)} supported regions from config")
+            return regions
+
+        except Exception as e:
+            logger.warning(f"Error loading config, using default regions: {e}")
+            # Fallback to default regions
+            return [
+                'us-east-1', 'us-east-2', 'us-west-2',
+                'ap-northeast-1', 'ap-south-1', 'ap-southeast-3',
+                'eu-central-1', 'eu-north-1', 'eu-south-1', 'eu-west-1', 'eu-west-2',
+                'sa-east-1'
+            ]
 
     def __init__(
         self,
@@ -46,6 +86,26 @@ class OpenAIProvider(BaseLLMProvider):
         self.region = region
         self.profile = profile
 
+        # Load supported regions dynamically from config
+        supported_regions = self._load_supported_regions()
+
+        # Validate region supports OpenAI models
+        if region not in supported_regions:
+            logger.warning(
+                f"Region '{region}' may not support OpenAI models. "
+                f"Supported regions: {', '.join(supported_regions[:5])}..."
+            )
+            logger.warning(f"Full list: {', '.join(supported_regions)}")
+
+        # Validate model ID
+        if model not in self.PRICING:
+            logger.error(f"Invalid OpenAI model ID: {model}")
+            logger.error(f"Valid model IDs: {list(self.PRICING.keys())}")
+            raise ValueError(
+                f"Invalid model ID '{model}'. "
+                f"Valid OpenAI models: {list(self.PRICING.keys())}"
+            )
+
         # Initialize boto3 session
         try:
             if profile:
@@ -57,6 +117,7 @@ class OpenAIProvider(BaseLLMProvider):
 
             self.client = session.client('bedrock-runtime')
             logger.info(f"Bedrock client initialized for OpenAI models in region: {region}")
+            logger.info(f"Model: {model}")
 
         except NoCredentialsError:
             logger.error("AWS credentials not found")
@@ -169,8 +230,19 @@ class OpenAIProvider(BaseLLMProvider):
                 logger.error("Request throttled - consider reducing request rate")
             elif error_code == 'ModelNotReadyException':
                 logger.error(f"Model {self.model} not available in {self.region}")
+                logger.error(f"Check model access at: https://console.aws.amazon.com/bedrock/home?region={self.region}#/modelaccess")
             elif error_code == 'ValidationException':
-                logger.error("Invalid request parameters")
+                supported_regions = self._load_supported_regions()
+                logger.error("Invalid request - possible causes:")
+                logger.error(f"  1. Model '{self.model}' not available in region '{self.region}'")
+                logger.error(f"  2. Model access not enabled - visit AWS Bedrock console to request access")
+                logger.error(f"  3. Supported regions: {', '.join(supported_regions)}")
+                logger.error(f"  4. Valid models: {list(self.PRICING.keys())}")
+                logger.error(f"\nTo enable model access, visit:")
+                logger.error(f"https://console.aws.amazon.com/bedrock/home?region={self.region}#/modelaccess")
+            elif error_code == 'AccessDeniedException':
+                logger.error("Access denied - check IAM permissions for bedrock:InvokeModel")
+                logger.error(f"Also verify model access is enabled in region {self.region}")
 
             return self._format_error(e)
 

@@ -101,5 +101,42 @@
     "primary": "region-specific",
     "fallback": "global",
     "error_patterns": ["channel program", "not available for channel program accounts"]
+  },
+  "openai_models": {
+    "description": "OpenAI models available on AWS Bedrock",
+    "note": "These models require model access to be enabled in the AWS Bedrock console",
+    "models": [
+      {
+        "id": "openai.gpt-oss-120b-1:0",
+        "name": "GPT-OSS 120B",
+        "description": "Production - Larger model with higher reasoning capability",
+        "input_price": 3.00,
+        "output_price": 9.00,
+        "recommended_for": "Production use, complex analysis"
+      },
+      {
+        "id": "openai.gpt-oss-20b-1:0",
+        "name": "GPT-OSS 20B",
+        "description": "Fast & Cheap - Smaller, faster model",
+        "input_price": 0.50,
+        "output_price": 1.50,
+        "recommended_for": "Fast prototyping, cost-effective analysis"
+      }
+    ],
+    "supported_regions": [
+      "us-east-1", "us-east-2", "us-west-2",
+      "ap-northeast-1", "ap-south-1", "ap-southeast-3",
+      "eu-central-1", "eu-north-1", "eu-south-1", "eu-west-1", "eu-west-2",
+      "sa-east-1"
+    ],
+    "access_requirements": {
+      "description": "Steps to enable OpenAI model access",
+      "steps": [
+        "Visit AWS Bedrock console: https://console.aws.amazon.com/bedrock/home#/modelaccess",
+        "Request access to OpenAI models (gpt-oss-120b-1:0 and gpt-oss-20b-1:0)",
+        "Ensure IAM role has 'bedrock:InvokeModel' permission",
+        "Wait for access approval (usually instant for available models)"
+      ]
+    }
   }
 }
