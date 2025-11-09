@@ -199,6 +199,10 @@ class RuleActionDistributionSheet(BaseSheet):
             except Exception as e:
                 logger.warning(f"Could not create action distribution chart: {e}")
 
+        # Add LLM Findings Section
+        row_for_findings = row + 3 if rule_data else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Action Analysis Findings", merge_cols='A:G')
+
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 40
         ws.column_dimensions['B'].width = 15

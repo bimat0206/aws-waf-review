@@ -163,6 +163,10 @@ class ClientAnalysisSheet(BaseSheet):
             except Exception as e:
                 logger.warning(f"Could not create hourly pattern chart: {e}")
 
+        # Add LLM Findings Section
+        row_for_findings = row + 3 if top_clients else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Client Behavior Analysis Findings", merge_cols='A:F')
+
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 50
         ws.column_dimensions['B'].width = 20

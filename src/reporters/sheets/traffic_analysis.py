@@ -143,6 +143,14 @@ class TrafficAnalysisSheet(BaseSheet):
             except Exception as e:
                 logger.warning(f"Could not create geographic chart: {e}")
 
+        # Add LLM Findings Section
+        if geo_data or has_daily_chart:
+            row_for_findings = row + 3 if geo_data else row + 1
+        else:
+            row_for_findings = row + 1
+
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Traffic Analysis Findings")
+
         # Auto-adjust columns
         for col in ['A', 'B', 'C', 'D', 'E']:
             ws.column_dimensions[col].width = 18

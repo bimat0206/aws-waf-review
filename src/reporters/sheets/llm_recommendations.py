@@ -71,10 +71,9 @@ class LLMRecommendationsSheet(BaseSheet):
 
         # Sections with professional styling
         sections = [
-            ('Critical Findings', 'Immediate action required', 'FF6B6B'),
-            ('High Priority Recommendations', 'Implement within 30 days', 'FFA500'),
-            ('Medium Priority Optimizations', 'Implement within 90 days', 'FFD93D'),
-            ('Low Priority Suggestions', 'Nice to have improvements', '6BCF7F')
+            ('Critical Findings (Immediate Action Required)', 'Short-term implementation to address urgent vulnerabilities', 'FF6B6B'),
+            ('Mid/Long-Term Initiatives', 'Sustained improvement and adaptability to evolving threats', 'FFA500'),
+            ('Low Priority Suggestions (Nice to Have)', 'Nice to have improvements', '6BCF7F')
         ]
 
         for section_title, section_desc, color in sections:
@@ -95,7 +94,7 @@ class LLMRecommendationsSheet(BaseSheet):
             row += 1
 
             # Template rows
-            headers = ['Priority', 'Finding/Recommendation', 'Impact', 'Action Items']
+            headers = ['Priority', 'Recommendation', 'Impact', 'Action Items']
             self._format_header_row(ws, row, headers)
             row += 1
 
@@ -306,11 +305,11 @@ class LLMRecommendationsSheet(BaseSheet):
                 row += 1
 
             # Table headers - NEW FORMAT
-            headers = ['No', 'Finding', 'Expected Impact', 'Action Items', 'Rationale']
+            headers = ['No', 'Recommendation', 'Expected Impact', 'Action Items', 'Rationale']
             self._format_header_row(ws, row, headers)
             row += 1
 
-            # Findings data
+            # Recommendations data
             for idx, finding in enumerate(findings, start=1):
                 highlight = idx % 2 == 0
 
@@ -328,7 +327,7 @@ class LLMRecommendationsSheet(BaseSheet):
 
                 row_data = [
                     str(idx),  # No column
-                    finding.get('title', finding.get('finding', '')),  # Finding
+                    finding.get('title', finding.get('finding', finding.get('recommendation', ''))),  # Recommendation
                     finding.get('impact', finding.get('expected_impact', '')),  # Expected Impact
                     action_items_formatted,  # Action Items (bullet list)
                     finding.get('rationale', finding.get('reason', ''))  # Rationale
@@ -352,7 +351,7 @@ class LLMRecommendationsSheet(BaseSheet):
 
         # Auto-adjust columns for new format
         ws.column_dimensions['A'].width = 6   # No
-        ws.column_dimensions['B'].width = 35  # Finding
+        ws.column_dimensions['B'].width = 35  # Recommendation
         ws.column_dimensions['C'].width = 25  # Expected Impact
         ws.column_dimensions['D'].width = 40  # Action Items
         ws.column_dimensions['E'].width = 30  # Rationale

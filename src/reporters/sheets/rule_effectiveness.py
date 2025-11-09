@@ -133,6 +133,10 @@ class RuleEffectivenessSheet(BaseSheet):
             except Exception as e:
                 logger.warning(f"Could not create attack type chart: {e}")
 
+        # Add LLM Findings Section
+        row_for_findings = row + 3 if rule_data else row + 1
+        self._add_llm_findings_section(ws, row_for_findings, "LLM-Generated Rule Effectiveness Findings", merge_cols='A:G')
+
         # Auto-adjust columns
         ws.column_dimensions['A'].width = 50
         for col in ['B', 'C', 'D', 'E', 'F', 'G']:
